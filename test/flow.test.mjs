@@ -523,6 +523,7 @@ test('rules_text_merges_decisions_into_user_gates', () => {
   assert.match(section, /先给建议与依据/)
   assert.match(section, /完整材料/)
   assert.match(section, /等待给足/)
+  assert.doesNotMatch(section, /判定自己下结论/, 'the old self-deciding clause must be gone')
 })
 
 test('route_missing_message_points_at_in_session_execution', () => {

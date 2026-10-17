@@ -48,6 +48,16 @@ test('lib/*.js is hand-written: no official implementation imports, no Node APIs
   }
 })
 
+test('lib never hard-codes a concrete stage name or model', () => {
+  const files = readdirSync(new URL('../lib', import.meta.url)).filter(name => name.endsWith('.js'))
+  const modelLiteral = /\b(kilo|opencode-go|mimo|qwen|big-pickle)\b|deepseek-(?!ai\b)/
+  const stageLogic = /(stage|merged|node|item)\.id\s*===\s*['"](?!string['"]|number['"]|boolean['"]|object['"]|function['"]|symbol['"]|bigint['"]|undefined['"])/
+  for (const name of files) {
+    const source = read('lib/' + name)
+    assert.ok(!modelLiteral.test(source), 'lib/' + name + ' must not name a concrete model')
+    assert.ok(!stageLogic.test(source), 'lib/' + name + ' must not branch on a literal stage id')
+  }
+})
 test('display metadata is shipped for both locales', () => {
   for (const locale of ['en', 'zh']) {
     const meta = JSON.parse(read(`locale/${locale}.json`))
