@@ -52,10 +52,12 @@ test('lib never hard-codes a concrete stage name or model', () => {
   const files = readdirSync(new URL('../lib', import.meta.url)).filter(name => name.endsWith('.js'))
   const modelLiteral = /\b(kilo|opencode-go|mimo|qwen|big-pickle)\b|deepseek-(?!ai\b)/
   const stageLogic = /(stage|merged|node|item)\.id\s*===\s*['"](?!string['"]|number['"]|boolean['"]|object['"]|function['"]|symbol['"]|bigint['"]|undefined['"])/
+  const stageNameOp = /(stage|merged|node|item)\.id\.(startsWith|endsWith|includes|match)\(/
   for (const name of files) {
     const source = read('lib/' + name)
     assert.ok(!modelLiteral.test(source), 'lib/' + name + ' must not name a concrete model')
     assert.ok(!stageLogic.test(source), 'lib/' + name + ' must not branch on a literal stage id')
+    assert.ok(!stageNameOp.test(source), 'lib/' + name + ' must not branch on a stage-name prefix or substring')
   }
 })
 test('display metadata is shipped for both locales', () => {
