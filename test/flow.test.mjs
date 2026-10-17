@@ -326,6 +326,31 @@ test('buildLanes: no join, nested group, branching inside a lane, too many lanes
   assert.ok(has(buildLanes(many.nodes, many.edges, many.nodes[0], { maxLanes: 2 }).problems, 'FLOW_TOO_MANY_LANES'))
 })
 
+test('laneDir: default .worktrees, `branch` mirrors the branch name, other values are parent dirs', () => {
+  const flow = extra => ['flowchart TD', '  %% entry: s', '  s["S"] --> g{{"G"}}', '  g --> a["A"]', '  g --> b["B"]',
+    '  a --> j["J"]', '  b --> j', ...extra]
+  const lanesOf = text => {
+    const resolved = resolveFlow(text, {})
+    const stage = resolved.stages.find(item => item.id === 'a')
+    return {
+      worktree: stage.lane.worktree,
+      branch: stage.lane.branch,
+      codes: resolved.problems.map(item => item.code),
+    }
+  }
+  assert.equal(lanesOf(doc(null, flow([]))).worktree, '.worktrees/a')
+  const branchMode = lanesOf(doc(['racing-code: 1', 'laneDir: branch'], flow([])))
+  assert.deepEqual([branchMode.worktree, branchMode.branch], ['racing/a', 'racing/a'])
+  assert.ok(!branchMode.codes.includes('FLOW_LANE_DIR_INVALID'))
+  assert.equal(lanesOf(doc(['racing-code: 1', 'laneDir: wt'], flow([]))).worktree, 'wt/a')
+
+  for (const bad of ['../evil', '/abs/path', '', 'a/b']) {
+    const result = lanesOf(doc(['racing-code: 1', `laneDir: "${bad}"`], flow([])))
+    assert.equal(result.worktree, '.worktrees/a', `laneDir ${JSON.stringify(bad)} must fall back`)
+    assert.ok(result.codes.includes('FLOW_LANE_DIR_INVALID'), `laneDir ${JSON.stringify(bad)} must warn`)
+  }
+})
+
 // ─────────────────────────────── loops ───────────────────────────────
 
 test('buildLoops: a back edge into a group is a review round with the configured cap', () => {
@@ -527,7 +552,7 @@ test('the repository flow file resolves cleanly, with lanes and a review loop', 
   assert.deepEqual(
     resolved.loops.map(l => `${l.kind} ${l.via}->${l.backTo} ${l.maxRounds ?? l.maxRepeats}`).sort(),
     ['review verdict->race 2', 'stage final->design 3', 'stage gate->design 3'])
-  assert.equal(byId(resolved, 'implement-a').lane.worktree, '.worktrees/implement-a')
+  assert.equal(byId(resolved, 'implement-a').lane.worktree, 'racing/implement-a')
   assert.equal(byId(resolved, 'implement-a').route.model, 'deepseek-v4.1-flash')
   assert.equal(byId(resolved, 'implement-a').authorized, true)
   assert.match(byId(resolved, 'cr').instruction, /评审/)

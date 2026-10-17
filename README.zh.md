@@ -1,6 +1,6 @@
 # dsh-racing-code
 
-> **状态：v0.1.0，已实现并装入本机 profile（`web`）。** 零依赖、零构建、宿主半 + 纯函数层，68 个测试全绿。
+> **状态：v0.1.0，已实现并装入本机 profile（`web`）。** 零依赖、零构建、宿主半 + 纯函数层，69 个测试全绿。
 > 安装、按 agent 注册段落与工具、段落真的进 prompt、改文件热刷新、改配置热生效、
 > "没声明就不启用"都已在真实会话里验过（证据见 [doc/development.md](doc/development.md) §M4）。
 
@@ -60,7 +60,7 @@ mkdir -p doc && cp /home/liumenghan/dsh-racing-code/main/doc/racing-code.md doc/
 |---|---|
 | 赛道（lane） | 图上**并行组节点** `{{…}}` 的每条出边：各自在自己的 git worktree 里、用不同模型独立完成同一件事 |
 | 发车 | 编排者在**同一条消息**里把所有 lane 同时发起，不是一条条排队 |
-| 物理隔离 | 每条 lane 一个 `git worktree` + 独立分支（`.worktrees/<lane-id>`、`racing/<lane-id>`），互不覆盖 |
+| 物理隔离 | 每条 lane 一个 `git worktree` + 独立分支（`racing/<lane-id>`），互不覆盖。目录默认 `<项目根>/.worktrees/<lane-id>`；流程文件写 `laneDir: branch` 时**目录 = 分支名**（如 `racing/implement-a`），与"每个分支一个目录"的容器布局一致 |
 | 裁判（CR） | 所有赛道汇聚到**评审阶段**，在同一标准下逐条打分、列问题 |
 | 复盘轮 | CR 把**每条赛道自己的问题**发回**那条赛道原来的模型**（`send_message` 给同一个子代理），在原 worktree、原分支上改，提交后复评；**改到每条赛道都没问题，那一轮才给出胜者**；轮次上限 `maxReviewRounds`（默认 2），超限停下问你 |
 | 最有价值的信号 | **共同问题**：≥2 条赛道都犯的同一类问题 ≈ 约束有歧义/有缺口。让它们各自绕过只会把规格问题伪装成风格差异，所以**不走赛道修订**，而是停下问你 |
@@ -137,7 +137,8 @@ flowchart TD
   （`maxReviewRounds`，默认 2）；两者超限都停下问你；
 - `### <阶段 id>` 小节是该阶段的**委派提示词骨架**，由 `flow_stages` 按需返回；
 - 文件的其余部分是自由正文，写给人看、不进提示词——所以这份 markdown 同时也是项目的流程文档；
-- **lane 的隔离是硬约束**：`<项目根>/.worktrees/<lane-id>` + 分支 `racing/<lane-id>`，跨轮**复用**
+- **lane 的隔离是硬约束**：目录由 front-matter 的 `laneDir` 决定（默认 `<项目根>/.worktrees/<lane-id>`；
+  `laneDir: branch` 时为 `<项目根>/racing/<lane-id>`，即目录 = 分支名）+ 分支 `racing/<lane-id>`，跨轮**复用**
   （同一个 worktree、同一个分支、同一个模型；"轮次"不是"新赛道"）。子代理没有 cwd 参数，
   所以 lane 的提示词里必须写死 worktree 的绝对路径（模板见规范 §11）。
 
@@ -148,7 +149,7 @@ flowchart TD
 
 | 阶段 | 做什么 | 示例路由 |
 |---|---|---|
-| `plan` | 出方案、定验收标准；确认 `.worktrees/` 已在 `.gitignore` | `opencode-go` · `mimo-v2.6-pro` |
+| `plan` | 出方案、定验收标准；按 `laneDir` 确认赛道目录策略（默认 `.worktrees` 要写进 `.gitignore`；`branch` 模式不用） | `opencode-go` · `mimo-v2.6-pro` |
 | `contract-tests` | 写签名与契约注释、按契约写测试、跑一次确认**红**（**所有赛道的共同标准**） | `opencode-go` · `glm-5.3-flash` ⁽¹⁾ |
 | `race{{并行实现}}` | **并行组**（不是阶段、不需要路由）：同时发两条赛道 | — |
 | `implement-a` | 赛道 1：在自己的 worktree 里实现到绿 | `opencode-go` · `deepseek-v4.1-flash` |
@@ -254,7 +255,7 @@ mkdir -p doc && cp <本仓库>/doc/racing-code.md doc/racing-code.md    # 或者
     │   ├── architecture.md             # 维护者视角：为什么长这样、扩展点依据、数据流
     │   ├── compatibility.md            # 依赖的官方契约清单与失效症状
     │   └── development.md              # 开发计划：里程碑、接口契约、验收、实测证据、风险
-    ├── test/                           # node --test：flow / sources / host / package 四组，68 个用例
+    ├── test/                           # node --test：flow / sources / host / package 四组，69 个用例
     ├── README.md                       # 英文
     └── README.zh.md                    # 本文
 ```
@@ -272,6 +273,10 @@ mkdir -p doc && cp <本仓库>/doc/racing-code.md doc/racing-code.md    # 或者
      config:
        projectFlowPath: main/doc/racing-code.md
    ```
+
+   车道目录也跟着这个布局走：本仓库的流程图写了 `laneDir: branch`，所以两条赛道分别落在
+   `racing/implement-a/`、`racing/implement-b/`，与 `main/` 同级——**目录名就是分支名**。
+   普通仓库（会话 cwd 就是工作区）保持默认 `.worktrees/` 即可，记得把它写进 `.gitignore`。
 
    插件包本身也**从 `main/` 安装**（`install_bundle /home/liumenghan/dsh-racing-code/main`），
    因为 `package.json` 在 worktree 里；这属于"插件在自己的仓库里被开发"的必然结果——

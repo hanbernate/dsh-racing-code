@@ -1,7 +1,7 @@
 # dsh-racing-code
 
 > **Status: v0.1.0 — implemented and installed in this machine's `web` profile.** Zero dependencies, no build,
-> host half plus a pure layer, 68 tests green. Installation, per-agent registration of the section and the tool,
+> host half plus a pure layer, 69 tests green. Installation, per-agent registration of the section and the tool,
 > the section actually reaching the prompt, live refresh on file edits, live reload of the Config, and
 > "not declared → not enabled" were all verified in a real session
 > (evidence in [doc/development.md](doc/development.md) §M4).
@@ -66,7 +66,7 @@ missing and where to add it — but **the GUI no longer merges it for you** (see
 |---|---|
 | Lane | each out-edge of a **parallel group node** `{{…}}`: one git worktree, one model, one independent take |
 | Green flag | the orchestrator launches **every lane in one message**, never one after another |
-| Physical isolation | one `git worktree` + branch per lane (`.worktrees/<lane-id>`, `racing/<lane-id>`) so lanes cannot overwrite each other |
+| Physical isolation | one `git worktree` + branch per lane (`racing/<lane-id>`) so lanes cannot overwrite each other. The directory defaults to `<project root>/.worktrees/<lane-id>`; with `laneDir: branch` in the flow file it **equals the branch name** (e.g. `racing/implement-a`), matching a container layout where every branch has its own directory |
 | Judge (CR) | all lanes converge on a **review stage** that scores each take against the same standard |
 | Review round | the CR sends **each lane its own problems** back to **that lane's own model** (`send_message` to the same child), which revises in the same worktree/branch and commits; the CR re-reviews, and **only when every lane is clean does that round declare a winner** (at most `maxReviewRounds`, default 2 — past that it asks you) |
 | The signal that matters | a **common problem** (≥2 lanes failing the same way) ≈ an ambiguous or missing constraint. Letting each lane work around it would disguise a spec gap as a style difference, so it **never goes to the lanes** — it stops and asks you |
@@ -149,7 +149,9 @@ A node's **shape** decides its kind ([full grammar and semantics](doc/workflow-f
 - a `### <stage id>` section is that stage's **delegation prompt skeleton**, returned on demand by `flow_stages`;
 - everything else in the file is free prose for humans — it never enters the prompt, so the markdown doubles as
   the project's flow documentation;
-- **lane isolation is a hard constraint**: `<project root>/.worktrees/<lane-id>` with branch `racing/<lane-id>`,
+- **lane isolation is a hard constraint**: the directory comes from the front matter's `laneDir` (default
+  `<project root>/.worktrees/<lane-id>`; `laneDir: branch` gives `<project root>/racing/<lane-id>`, i.e. directory
+  equals branch name), with branch `racing/<lane-id>`,
   **reused across rounds** (same worktree, same branch, same model — a round is not a new lane). The `subagent`
   tool has no cwd parameter, so a lane's prompt must spell out the worktree's absolute path (template in the
   spec, §11).
@@ -161,7 +163,7 @@ The "two lanes + CR review rounds" flow below is the smallest useful shape; this
 
 | Stage | What it does | Example route |
 |---|---|---|
-| `plan` | approach + acceptance criteria; make sure `.worktrees/` is in `.gitignore` | `opencode-go` · `mimo-v2.6-pro` |
+| `plan` | approach + acceptance criteria; settle the lane directory (`laneDir`): default `.worktrees` needs a `.gitignore` line, `branch` mode needs none | `opencode-go` · `mimo-v2.6-pro` |
 | `contract-tests` | signatures, contract comments, tests per contract, run once and show **red** (the **shared standard** for every lane) | `opencode-go` · `glm-5.3-flash` ⁽¹⁾ |
 | `race{{Parallel implement}}` | a **parallel group** (not a stage, no route): starts all lanes at once | — |
 | `implement-a` | lane 1: implement to green inside its own worktree | `opencode-go` · `deepseek-v4.1-flash` |
@@ -264,7 +266,7 @@ tree but a container holding the bare repository plus one directory per branch.
     ├── lib/index.js      # host half: ~standard Config, per-agent section + tool, cache/refresh/teardown
     ├── lib/flow.js       # pure layer: mermaid/YAML subset, graph rules, lanes, loops, routes, rendering
     ├── lib/sources.js    # source layer: read, enablement (disabled/missing/unreadable/invalid/ok), watch
-    ├── test/             # node --test: flow / sources / host / package (68 cases)
+    ├── test/             # node --test: flow / sources / host / package (69 cases)
     └── doc/{racing-code.md, workflow-format.md, architecture.md, compatibility.md, development.md}
 ```
 
@@ -284,6 +286,10 @@ Two consequences of that layout:
      config:
        projectFlowPath: main/doc/racing-code.md
    ```
+
+   Lane directories follow the same rule: this repository's flow sets `laneDir: branch`, so the two lanes land in
+   `racing/implement-a/` and `racing/implement-b/`, siblings of `main/` — **the directory name is the branch name**.
+   A normal repository (session cwd = the working tree) keeps the default `.worktrees/` and ignores it in git.
 
    The bundle itself is **installed from `main/`** (`install_bundle /home/liumenghan/dsh-racing-code/main`)
    because `package.json` lives in the worktree — an unavoidable consequence of developing a plugin inside its own

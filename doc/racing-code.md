@@ -3,6 +3,7 @@ racing-code: 1
 maxStageRepeats: 3
 maxLanes: 3
 maxReviewRounds: 2
+laneDir: branch                # 车道目录 = 分支名 → /home/liumenghan/dsh-racing-code/racing/<lane-id>
 models:
   design: opencode-go/mimo-v2.6-pro
   contract-tests: opencode-go/glm-5.3-flash
@@ -66,6 +67,7 @@ flowchart TD
 先定接口与契约，再写测试，**这一步不写实现**，而且**这一步的产物是两条赛道的共同标准**：
 
 - 在 `lib/*.js` 里写下导出签名与 JSDoc 契约（可以是抛 `not implemented` 的骨架）；
+- 赛道在 `/home/liumenghan/dsh-racing-code/racing/<lane-id>`（分支名即目录名，见 front-matter 的 `laneDir: branch`）；
 - 在 `test/*.test.mjs` 里按契约写用例（`node --test`），覆盖正常路径与失败路径；
 - 跑一次 `npm test`，确认**红**，并把红的输出贴进汇报；
 - 测试定稿后**赛道不得修改**；契约本身有问题就停下来说明，回到 `design`。
@@ -74,8 +76,8 @@ flowchart TD
 
 两条**并行**赛道，同一份契约、不同模型，互不干扰：
 
-- 只有你的 worktree 是你的：`/home/liumenghan/dsh-racing-code/.worktrees/implement-a`
-  （或 `implement-b`），分支 `racing/implement-a`；主工作区别动；
+- 只有你的 worktree 是你的：`/home/liumenghan/dsh-racing-code/racing/implement-a`
+  （或 `racing/implement-b`），分支 `racing/implement-a`；主工作区（`main/`）别动；
 - 所有命令用 `cd <worktree> && …`，文件工具用该目录下的绝对路径；
 - 只改 `lib/`，**不得**改 `test/` 里的断言、不得删除用例；
 - 不要去看另一条赛道的 worktree：独立作答才有比较价值；

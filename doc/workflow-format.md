@@ -61,6 +61,7 @@ racing-code: 1                 # 格式版本；省略视为 1，写别的值 �
 maxStageRepeats: 3             # 可选：同一阶段在一轮任务里最多重复几次（回边护栏），默认 3
 maxLanes: 4                    # 可选：一个并行赛段最多几条 lane，默认 4
 maxReviewRounds: 2             # 可选：评审后最多几轮"反馈 → 赛道修订"，默认 2
+laneDir: branch                # 可选：赛道 worktree 放哪；默认 .worktrees，写 branch 表示"目录 = 分支名"
 models:                        # 可选：模型表（与图内标注等价，图内优先，见 §7）
   cr: opencode-go/mimo-v2.6-pro
 ---
@@ -228,7 +229,8 @@ contract-tests ──► race ──┤                                    ├�
 
 | 项 | 约定 |
 |---|---|
-| 位置 | `<项目根>/.worktrees/<lane-id>/`（**必须在项目根之下**，见下） |
+| 位置 | 默认 `<项目根>/.worktrees/<lane-id>/`；front-matter 写 `laneDir: branch` 时是 `<项目根>/racing/<lane-id>/`
+（目录 = 分支名）；写别的值（如 `laneDir: wt`）就用它当父目录。**一律必须在项目根之下**（见下） |
 | 分支 | `racing/<lane-id>` |
 | 建立 | 编排者在**开赛前**执行 `git worktree add .worktrees/<lane-id> -b racing/<lane-id>` |
 | 子代理怎么进去 | `subagent` 工具**没有 cwd 参数**，子代理继承父会话的 cwd（= 项目根）。所以 lane 的提示词里必须写死绝对路径：所有 bash 用 `cd <worktree> && …`，文件工具用绝对路径 |
@@ -408,6 +410,7 @@ CR 的结论**不是**"选一个赢家"就结束，而是一个闭环：
 | `FLOW_UNPARSABLE_EDGE` | error | 认不出的边写法 | 文件作废 |
 | `FLOW_UNPARSABLE_NODE` | error | 认不出的节点写法 | 文件作废 |
 | `FLOW_YAML_UNSUPPORTED` | error | front-matter 用了子集外的写法 | 文件作废 |
+| `FLOW_LANE_DIR_INVALID` | warn | front-matter 的 `laneDir` 不是**单个相对目录名**（空、含 `/` 或 `\`、含 `..`、以 `~` 开头都算非法；关键字 `branch` 合法） | 忽略该值，按默认 `.worktrees` 处理并提示 |
 | `FLOW_MODEL_UNKNOWN_STAGE` | warn | 模型表里有图里没有的 id | 忽略该条，提示 |
 | `FLOW_ROUTE_MALFORMED` | warn | 某阶段的路由写法不对（既不是 `provider/model`，也不是 `{provider, model}`） | 忽略该条，按"未配置"处理并提示 |
 | `FLOW_ROUTE_MISSING` | warn | 某阶段没路由 | 用当前会话模型兜底 + 提示 |
@@ -431,6 +434,8 @@ CR 的结论**不是**"选一个赢家"就结束，而是一个闭环：
 - [ ] CR 的模型与任何 lane 都不同（避免自评偏好）；
 - [ ] 评审回边指向**并行组**（而不是某一条 lane），并且带条件；
 - [ ] `maxReviewRounds` 设成了你愿意等的轮数（默认 2）；
+- [ ] `laneDir` 与你的布局一致：普通仓库用默认 `.worktrees`（记得加进 `.gitignore`）；
+  "项目目录本身是 worktree 容器、每个分支一个目录"的布局用 `laneDir: branch`，此时不需要 ignore 任何东西；
 - [ ] 每条 lane 的提示词里都写了"你的 worktree 绝对路径"（模板见 §11）；
 - [ ] 有一条明确的"完成"路径（终点阶段），跑完它就算这轮任务结束；
 - [ ] 分支/用户关口的条件文字都写得能被回答（"测试全绿?" 而不是 "好不好?"）；
@@ -439,11 +444,15 @@ CR 的结论**不是**"选一个赢家"就结束，而是一个闭环：
 
 ## 11. lane 提示词模板（给编排者用）
 
+把模板里的 `<worktree>` 换成 **`flow_stages` 给出的该赛道 worktree 绝对路径**（它的位置由 front-matter 的
+`laneDir` 决定：默认 `<项目根>/.worktrees/<lane-id>`，`laneDir: branch` 时是 `<项目根>/racing/<lane-id>`），
+`<worktree>` 与分支名一一对应。
+
 **首轮（开赛）**：
 
 ```
-你在 git worktree /abs/path/.worktrees/implement-a 里工作（分支 racing/implement-a）。
-主工作区 /abs/path 不要改；所有命令用 `cd /abs/path/.worktrees/implement-a && …`，
+你在 git worktree <worktree> 里工作（分支 racing/implement-a）。
+主工作区 /abs/path 不要改；所有命令用 `cd <worktree> && …`，
 文件工具请用该目录下的绝对路径。
 任务：<阶段说明>。
 约束：契约与测试在 <路径>；**不得修改测试断言**；验收命令 `<命令>`。
@@ -459,7 +468,7 @@ CR 第 <N> 轮对你这条赛道的结论是"未通过"，只列你自己的问�
 1) <问题>
 2) <问题>
 本轮验收标准：`<失败的命令或断言>`。
-请在你的 worktree /abs/path/.worktrees/implement-a 里修改并提交（message 前缀 `round <N+1>:`），
+请在你的 worktree <worktree> 里修改并提交（message 前缀 `round <N+1>:`），
 不要改动主工作区，也不要改测试断言。完成后回报：改了什么 + 验收命令输出。
 ```
 

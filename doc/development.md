@@ -62,7 +62,7 @@ dsh-racing-code/
 | # | 里程碑 | 产物 | 依赖 | 规模 | 状态 |
 |---|---|---|---|---|---|
 | **M0** | 仓库骨架与包元数据 | `package.json`、`cordis.patch.yml`、`locale/`、`test/` | — | 小 | ✅ 完成 |
-| **M1** | 纯函数层 `lib/flow.js` | 解析 / 校验 / 合并 / 渲染（无 I/O、无 DSH 依赖） | — | **大** | ✅ 完成（37 用例） |
+| **M1** | 纯函数层 `lib/flow.js` | 解析 / 校验 / 合并 / 渲染（无 I/O、无 DSH 依赖） | — | **大** | ✅ 完成（38 用例） |
 | **M2** | 取源与启用判定 `lib/sources.js` | 读文件、判定五态、`fs.watch` | M1 | 小 | ✅ 完成（13 用例） |
 | **M3** | 宿主半 `lib/index.js` | Config、按 agent 注册段落与工具、缓存与热刷新 | M1 M2 | 中 | ✅ 完成（14 用例） |
 | **M4** | 端到端验收 | 安装/注册/段落进 prompt/热刷新/配置热生效/"没声明就不启用" | M3 | 中 | ✅ 完成（**赛道 e2e 按用户决定暂缓**，见下） |
@@ -226,7 +226,7 @@ lib/  test/           空目录，等 M1 起
 | `Tool.listTools` | ✅ 出现 `flow_stages`（活跃会话的 `agents.list()` 安装路径生效） |
 | **段落真的进了系统提示** | ✅ 会话日志 `system/message` 里含 `项目流程：/home/liumenghan/dsh-racing-code/doc/racing-code.md` + 紧凑图 + 路由 + 规则行；安装**前**那一条没有它 |
 | **文件变更热刷新** | ✅ 同一条日志里最新一条 system prompt 已经是我改图**之后**的版本（含 `needs-code{要改代码吗?}`）——`fs.watch` → 重算 → 下一步生效，全程真实会话 |
-| **`flow_stages` 真实读盘** | ✅ 在会话里直接调用：返回入口 `design`、6 个阶段、`[race: implement-a ∥ implement-b]`、3 条回边（评审轮最多 2 轮）、各阶段路由、`.worktrees/implement-a`（`racing/implement-a`）、全部阶段说明与渲染好的带模型 mermaid |
+| **`flow_stages` 真实读盘** | ✅ 在会话里直接调用：返回入口 `design`、6 个阶段、`[race: implement-a ∥ implement-b]`、3 条回边（评审轮最多 2 轮）、各阶段路由、`.worktrees/implement-a`（当时还是默认布局；现在本仓库用 `laneDir: branch`，赛道目录是 `racing/implement-a`）、全部阶段说明与渲染好的带模型 mermaid |
 | **配置热生效 + "没声明就不启用"活路径** | ✅ 临时把该行 `projectFlowPath` 指向 `doc/racing-code.md.disabled` → 下一步的 `system/message` **不再含流程段落**、`request/header` 里 **`flow_stages` 消失**；还原补丁 → 工具**重新出现在请求头**（全程未重启、未新开会话）。探针已删除，profile 补丁已还原 |
 
 **仍未实测的两条**（诚实记录，等第一次真跑赛道时确认）：

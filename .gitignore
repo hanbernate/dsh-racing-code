@@ -1,4 +1,7 @@
-# lane worktrees for racing-code runs
+# Lane worktrees for racing-code runs.
+# This repository uses `laneDir: branch` (see doc/racing-code.md), so its lanes live in
+# racing/<lane-id>/ at the project root — outside every worktree, nothing to ignore.
+# The entry below is for the default `laneDir` mode, kept for normal repositories.
 .worktrees/
 
 # local scratch: temporary scripts/analysis (see the temporary-scripts skill)

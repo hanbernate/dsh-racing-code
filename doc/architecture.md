@@ -186,14 +186,16 @@ DSH 已经给了全部所需接缝，所以**不需要改 DSH 源码**：
 "多个模型分别实现"必须**物理隔离**，否则 lane 之间会互相覆盖同一批文件，比较也失去意义：
 
 ```
-<项目根>/.worktrees/implement-a/   ← lane A 的 worktree，分支 racing/implement-a
-<项目根>/.worktrees/implement-b/   ← lane B 的 worktree，分支 racing/implement-b
+<项目根>/.worktrees/implement-a/   ← 默认：目录由 laneDir 决定，分支 racing/implement-a
+<项目根>/racing/implement-a/       ← laneDir: branch：目录 = 分支名（容器布局用这个）
+<项目根>/racing/implement-b/       ← lane B 的 worktree，分支 racing/implement-b
 ```
 
 四个不能让步的点：
 
 1. **worktree 必须在项目根之下**。沙箱 `workspace-write` 只允许写工作区根与临时目录；建在 `../` 会被拒绝。
-   代价是会被 `git status` 看到，所以约定把 `.worktrees/` 写进 `.gitignore`（由流程里的 `plan` 阶段或人来做，
+   用默认 `laneDir` 时它落在工作区内，会被 `git status` 看到，所以约定把 `.worktrees/` 写进 `.gitignore`（由流程里的 `plan` 阶段或人来做，
+   而 `laneDir: branch` 的容器布局下车道目录在项目根、任何 worktree 之外，不需要 ignore 任何东西）；
    **插件不写工作区文件**）。
 2. **子代理没有 cwd 参数**（§2 表）。lane 的提示词必须写死绝对路径：bash 用 `cd <worktree> && …`，
    文件工具用绝对路径。这条写进 lane 的阶段说明模板里（[workflow-format.md §11](workflow-format.md)）。
@@ -273,7 +275,7 @@ cr → {存在共同问题?} --有--> (用户决定：完善约束还是接受�
       implement-a=opencode-go·deepseek-v4.1-flash  implement-b=kilo·kilo-auto/free
       cr=opencode-go·mimo-v2.6-pro  commit=kilo·kilo-auto/free
 规则：每阶段前台 subagent 一次并显式传 provider/model；子代理看不到本会话，提示词必须自包含；
-      [race: …] 是并行组：同一条消息里同时发起，各自在 .worktrees/<lane-id>（分支 racing/<lane-id>）
+      [race: …] 是并行组：同一条消息里同时发起，各自在自己的 worktree（路径见 flow_stages；分支 racing/<lane-id>）
       里工作，提示词写死绝对路径；汇合点要等所有赛道结束后才开始；落败赛道的 worktree 不得擅自删除；
       cr 的问题按赛道切分，用 send_message 发回该赛道原来的子代理，在原 worktree/原分支上改并提交，
       最多 2 轮"反馈 → 修订"，改到每条赛道都通过才定胜负；共同问题走用户关口，不得让赛道各自绕过；
@@ -309,7 +311,7 @@ cr → {存在共同问题?} --有--> (用户决定：完善约束还是接受�
   ],
   "stages": [                                // 只列阶段；顺序 = 执行顺序
     { "id": "implement-a", "label": "实现 A",
-      "lane": { "id": "implement-a", "worktree": ".worktrees/implement-a", "branch": "racing/implement-a",
+      "lane": { "id": "implement-a", "worktree": "racing/implement-a", "branch": "racing/implement-a",
                 "fanOutFrom": "race", "joinAt": "cr" },
       "route": { "provider": "opencode-go", "model": "deepseek-v4.1-flash", "authorized": true,
                  "source": "label" },        // label | front-matter | fallback
@@ -381,6 +383,7 @@ cr → {存在共同问题?} --有--> (用户决定：完善约束还是接受�
 | 缺路由时 | 用**当前会话模型**兜底 + 明确提示 | 报错：新增阶段就卡住；猜模型：静默跑错模型 |
 | 分支 | **v1 就支持**条件边与回边 | 只支持单链：TDD 的"红了回实现"是主线场景 |
 | 并行怎么表达 | **显式的并行组节点** `{{…}}`，每个出边一条 lane | 让阶段的多条无条件出边表示并行：**回边没法指回"这一组赛道"**，"再来一轮"只能重新画一批节点 |
+| lane 的目录 | 由流程文件的 `laneDir` 决定（默认 `.worktrees`；`branch` = 目录即分支名） | 写死 `.worktrees/`：在"项目目录是 worktree 容器、每个分支一个目录"的布局里（`main/` 与 `racing/<lane-id>/` 同级）显得格格不入；写死"目录 = 分支名"：普通仓库里会和项目自己的目录撞名，且要 ignore `racing/`。可配一次，两种布局都自然 |
 | lane 的隔离方式 | **git worktree（必须在项目根之下）** | 同一个工作区串行：多个模型互相覆盖，没有可比性；建在 `../`：沙箱直接拒绝 |
 | 修订轮由谁改 | **发回该赛道原来的模型/原子代理** | CR 直接动手改：评审与实现同一只手；换一个新子代理改：丢掉"它为什么这么写"的上下文 |
 | 反馈的粒度 | **按赛道切分**，只给该赛道自己的问题 | 把横向比较一起发过去：下一轮的"独立作答"就没了 |
