@@ -139,6 +139,16 @@ profile `web`，`patchReload: live`，时间 2026-10-17。
 - **失效症状**：`send_message` 报目标不可用；或赛道在修订轮里"突然开始模仿另一条赛道"（说明反馈串了）。
 - **兜底**：任何情况下都**不**让 CR 直接改赛道代码——评审与实现同一只手，比较就失去意义。
 
+### 1.9 `ctx.get('llm')`：llm 目录（bootstrap 模型选项卡的候选来源）
+
+- **依赖**：`llm` 服务的 `listProviders(): LlmProviderInfo[]`（同步）与 `await listModels(providerId): LlmModelInfo[]`
+  （`LlmModelInfo = { provider, id, name, description? }`）。`racing_code_init` 的候选池 = 子代理白名单 ∩ 该目录。
+- **核实**：CR 阶段在 /home/liumenghan/deepseek-harness 实证（`packages/llm` 的 api-catalog 与 types）；
+  本机目录由 profile 的 `llm-pi-ai` providers 配置提供（opencode-go / kilo）。
+- **降级**：`ctx.get('llm')` 不可用或字段缺失 → 候选为空 + `BOOTSTRAP_NO_CANDIDATES`（选项卡只剩"用会话模型"）；
+  白名单服务不可用（`allowedModels === null`）→ 跳过校验、候选 = 全目录。
+- **失效症状**：选项卡空，或列出了白名单里有、上游却已下线的路由（目录本身也会腐烂，见 §2）。
+
 ## 2. 上游模型（不是 DSH 契约，但同样会"漂"）
 
 2026-10-17 用真实调用实测过的一轮，记在这里当基准线。**"目录里有"不等于"能用"**——

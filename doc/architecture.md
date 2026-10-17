@@ -57,6 +57,7 @@ DSH 已经给了全部所需接缝，所以**不需要改 DSH 源码**：
 |---|---|---|
 | 项目根 | `agent.session.header.cwd`（会话创建时的绝对工作目录） | `packages/core/session/src/types.ts:104`；官方用法 `packages/context/file-reference-local/src/index.ts:122` |
 | 按 agent（= 按项目）注册段落与工具 | `agent.ctx.inject([...], scope => scope.systemPrompt.section(...) / scope.tools.register(...))` + `ctx.on('agent/created' / 'agent/disposed')`；**通过 `agent.ctx` 注册的工具只对该 agent 可见** | `packages/context/file-reference-local/src/index.ts:69-91`；`packages/core/scope/README.md`（"a tool registered through `agent.ctx` is visible only to that agent"） |
+| llm 目录（bootstrap 候选池）| `ctx.get('llm')` 的 `listProviders()` / `await listModels(providerId)`（返回 `{provider, id, name, description?}`）| 服务目录 `llm`；CR 阶段在 harness 实证（[compatibility.md](compatibility.md) §1.9）|
 | `agent/created` 是**可等待**的串行事件 | 签名返回 `undefined \| Promise<undefined>`，`mode: serial` | 实测 `cordis_inspect_query Event` |
 | 读项目文件 | `ctx.fs.resolve(path, { cwd })` / `readText` / `stat` / `watch`；**读取不受沙箱模式限制** | 服务目录 `fs`；`packages/fs/fs-sandbox/README.md`（"preserving the local filesystem's read behavior"） |
 | 提示段落 | `ctx.systemPrompt.section({ name, order, text })`；`text` 是**同步**函数 | `packages/core/system-prompt/src/index.ts:66`；`SECTION_ORDERS` 见 `:125` |

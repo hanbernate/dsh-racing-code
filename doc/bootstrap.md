@@ -62,7 +62,7 @@
 {
   template?: 'full' | 'minimal',            // 默认 'full'
   lanes?: 2 | 3 | 4,                        // 默认 2
-  models?: { [stageId]: 'provider/model' | 'session' },  // 只覆盖指定键；赛道未给 = 未选
+  models?: { [stageId]: 'provider/model' | 'session' },  // 只覆盖指定键；缺键 = 未选；显式 session = 用户已选（合法）
   write?: boolean,                          // 默认 false（预览）
   force?: boolean                           // 默认 false；仅 write:true 有效
 }
@@ -96,6 +96,8 @@ export function checkBootstrapTarget(input)     // {cwd, projectFlowPath} → {o
 export function bootstrapProtocol(input)        // {file, lanes} → string[]（§2 九步）
 ```
 
+**钉死（本轮约束）**：`catalog` 来自宿主 `ctx.get('llm')`（`listProviders()` 同步 + `await listModels(provider.id)`，映射 `{provider, model: id, note: description?}`）再与 `allowedModels` 求交；`allowedModels === null`（服务不可用）→ 跳过校验、候选 = 全目录；`allowedModels: []` → 零候选 + `BOOTSTRAP_NO_CANDIDATES`；`catalog: null`/目录不可用 → 零候选 + warn。**"零导入"指无 `node:`、无 `@deepseek-ai/*`；允许 `./flow.js` 纯函数导入**（`resolveFlow`）；`renderBootstrapTemplate` **必须在纯层自检 0-error**，不得把自检挪到宿主层。
+
 **gitLayout 的 fs 启发式**（[architecture.md](architecture.md) §10 禁子进程）：`.git` 是文件且内容含 `gitdir:` 且同级有 `.bare/` → `worktree-container`；`.git` 是目录 → `git-repo`；无 `.git` → `none`；`gitdir` 指向不存在 → `unknown` + warn。
 
 ### 3.3 `lib/flow.js`：`session` 哨兵
@@ -120,6 +122,7 @@ models:
 | `disabled` | 无 | 无 |
 | `missing` | **无（沉默）** | 仅 `racing_code_init`（`bootstrapEnabled` 时） |
 | `invalid` | 一句诊断（现状） | `flow_stages`（现状）+ `racing_code_init`（默认预览，`force` 才覆盖坏文件） |
+| `unreadable` | 一句诊断（现状） | 同 `invalid`：`flow_stages` + `racing_code_init`（默认预览；`force` 才覆盖） |
 | `ok` | 流程段落（现状） | `flow_stages`（现状），**不注册 init**（不给误覆盖好文件的机会） |
 
 子代理一律不注册（`agent.parentAgent !== undefined` 早退不变）。
@@ -158,7 +161,6 @@ flowchart TD
   design["设计"] --> final(["用户定稿?"])
   final -- "否" --> design
   final -- "是" --> needs-code{"要改代码吗?"}
-  needs-code -- "否：纯文档改动" --> commit["提交"]
   needs-code -- "是" --> contract-tests["接口 + 测试"]
   contract-tests --> race{{"并行实现"}}
   race --> implement-a["实现 A"]
@@ -171,12 +173,15 @@ flowchart TD
   gate -- "完善约束" --> design
   gate -- "接受现状" --> verdict
   verdict -- "否：按反馈修订" --> race
+  needs-code -- "否：纯文档改动" --> commit["提交"]
   verdict -- "是" --> commit
 ```
 
 ## 首次清单   ← 不进提示词，随文件 commit/review；确认后可删
 ## 阶段说明   ← ### <id> 每节 2–4 行可执行规则，会成为 flow_stages 的阶段说明
 ````
+
+> **声明顺序 = 阶段顺序**：`buildFlow` 按节点**首次声明**（带形状那次）的先后列出 stages，契约测试按此断言；要某阶段排最后，让它的声明出现在最后一条边上（上例 `commit` 就是这样排到最后的）。
 
 - `minimal` 预设：`plan → contract-tests → race{{}} → implement-a ∥ implement-b → cr → verdict{"每条赛道都通过?"}`，`%% entry: plan`，只留 verdict→race 一条回边。
 - 无条件写 `%% entry:`；两条回边都带条件文字；护栏显式写（3/4/2）；lane 的提示词里写死 worktree 绝对路径（[workflow-format.md](workflow-format.md) §11）。
@@ -202,6 +207,8 @@ flowchart TD
 7. 候选池为空（白名单禁用/为空）→ `BOOTSTRAP_NO_CANDIDATES`（warn；选项卡只剩"用会话模型"）；
 8. 所选 lane 与显式 `cr` 路由相同 → `BOOTSTRAP_CR_REUSE_RISK`（warn；插件拿不到会话模型名，涉及 `cr: session` 的精确比较留给编排者）；
 9. 写入成功 → `BOOTSTRAP_RESTART_REQUIRED`（info，"新开会话后生效"）。
+
+**钉死（本轮约束）**：`write:true` 时 `plan` 有 `blocked` 项（如 `gitLayout: 'none'`）一律**拒写**（fix 随 `plan` 返回）；`force` 的 `replaceIfVersion` 版本取 `stat.version`；`generatedOn` 必须是 `YYYY-MM-DD`，否则 `BOOTSTRAP_TEMPLATE_INVALID`（含 `-->` 注入防护）；`.git` 文件**无** `gitdir:` → `unknown`（不是 `git-repo`）；相对 `gitdir` 以 `.git` 所在目录为基准解析、路径允许含空格。lane 的 worktree **绝对路径**由编排者在 lane 提示词里写死（[workflow-format.md](workflow-format.md) §11 模板），工具输出与生成文本只给相对目录（`racing/<lane-id>` / `<laneDir>/<lane-id>`）。`BOOTSTRAP_CR_REUSE_RISK` 保持"无条件提示"（cr 默认走会话模型、lane 与会话撞模型有自评偏好），**精确比较移交编排者**（插件拿不到会话模型名）。
 
 ---
 
