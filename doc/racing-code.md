@@ -5,11 +5,11 @@ maxLanes: 3
 maxReviewRounds: 2
 laneDir: branch                # 车道目录 = 分支名 → /home/liumenghan/dsh-racing-code/racing/<lane-id>
 models:
-  design: opencode-go/mimo-v2.6-pro
-  contract-tests: opencode-go/deepseek-v4.1-flash
+  design: session                 # 显式"用当前会话模型"→ 在当前会话直接执行
+  contract-tests: session
+  cr: session
   implement-a: opencode-go/deepseek-v4.1-flash
   implement-b: opencode-go/glm-5.3-flash
-  cr: opencode-go/mimo-v2.6-pro
   commit: kilo/kilo-auto/free
 ---
 
@@ -17,10 +17,13 @@ models:
 
 这份文件就是这个项目的"每项目一份流程 markdown"：本仓库的会话里，编排者按下面这张图推进任务；
 每个阶段用哪个模型见 front-matter（也可用 `flow_stages` 工具查）。
+路由为 `session` 或未配的阶段**在当前会话直接执行**（不委派子代理）；**例外**：`commit` 阶段永远委派，赛道（lane）永远委派。
 
 写代码之前先用文档把设计说清楚（**设计不写代码**），设计被用户明确确认后才进入实现；
 实现阶段**两个模型各开一条赛道**（各自一个 git worktree），CR 逐轮把各自的问题发回对应赛道
 （**发回之前先由用户确认**：图上 `confirm` 关口），**改到每条赛道都通过才定胜负、提交**。
+
+**判定与用户关口语义相同**：执行方先给**建议与依据**，再用 `ask_user_question` 让**用户**下判断（选项=出边文字）；提问前先把**完整材料**发出来（问题清单逐条、diff 摘要、建议），等待给足（≥10 分钟）。
 
 **纯文档改动不走赛道**：定稿后由 `要改代码吗?` 判定——只改文档（README / `doc/*.md`）就直接收口提交，
 不写契约测试、不开赛道（那两样对文档没有可比性）。
@@ -58,6 +61,8 @@ flowchart TD
 
 ### design
 
+**在当前会话直接执行**（路由 session，不委派子代理）。
+
 产出**设计文档**，不写代码：
 
 - 改 `README.zh.md` / `README.md` / `doc/*.md`，必要时新增文档；
@@ -66,6 +71,8 @@ flowchart TD
 - 产出：diff + 一段"改了什么、还留了哪些未决问题"的汇报。
 
 ### contract-tests
+
+**在当前会话直接执行**（路由 session，不委派子代理）。
 
 先定接口与契约，再写测试，**这一步不写实现**，而且**这一步的产物是两条赛道的共同标准**：
 
@@ -89,6 +96,8 @@ flowchart TD
 
 ### cr
 
+**在当前会话直接执行**（路由 session，不委派子代理）；关口提问带**完整材料 + 建议 + 依据**，等待给足。
+
 逐轮评审两条赛道，并回答"是不是我们的约束没说清"：
 
 1. 对每条 lane：`git -C <worktree> diff`（第 2 轮起只看本轮新增）、读 `lib/` 与 `test/`、
@@ -109,6 +118,8 @@ flowchart TD
 10. 只有一条赛道成功时，明确写"共同问题**无法判定**"。
 
 ### commit
+
+本阶段**委派**子代理执行（例外：永远委派）；胜者**合入当前工作分支**（`0.0.x`），**不直接落 `main`**；落败分支保留。
 
 收口与提交：
 
