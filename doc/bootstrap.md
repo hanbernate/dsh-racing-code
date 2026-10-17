@@ -96,7 +96,7 @@ export function checkBootstrapTarget(input)     // {cwd, projectFlowPath} → {o
 export function bootstrapProtocol(input)        // {file, lanes} → string[]（§2 九步）
 ```
 
-**钉死（本轮约束）**：`catalog` 来自宿主 `ctx.get('llm')`（`listProviders()` 同步 + `await listModels(provider.id)`，映射 `{provider, model: id, note: description?}`）再与 `allowedModels` 求交；`allowedModels === null`（服务不可用）→ 跳过校验、候选 = 全目录；`allowedModels: []` → 零候选 + `BOOTSTRAP_NO_CANDIDATES`；`catalog: null`/目录不可用 → 零候选 + warn。**"零导入"指无 `node:`、无 `@deepseek-ai/*`；允许 `./flow.js` 纯函数导入**（`resolveFlow`）；`renderBootstrapTemplate` **必须在纯层自检 0-error**，不得把自检挪到宿主层。
+**钉死（本轮约束）**：`catalog` 来自宿主 `ctx.get('llm')`（`listProviders()` 同步 + `await listModels(provider.id)`，映射 `{provider, model: id, note: description?}`）再与 `allowedModels` 求交；`allowedModels === null`（服务不可用）→ 跳过校验、候选 = 全目录；`allowedModels: []` → 零候选 + `BOOTSTRAP_NO_CANDIDATES`；`catalog: null`/目录不可用 → 零候选 + warn。**"零导入"指无 `node:`、无 `@deepseek-ai/*`；允许 `./flow.js` 纯函数导入**（`resolveFlow`）；`renderBootstrapTemplate` **必须在纯层自检 0-error**，不得把自检挪到宿主层。 **生成器与渲染层不得按阶段名分支、不得写死具体模型名**——文案里的模型一律来自声明或传入的 `models`。
 
 **gitLayout 的 fs 启发式**（[architecture.md](architecture.md) §10 禁子进程）：`.git` 是文件且内容含 `gitdir:` 且同级有 `.bare/` → `worktree-container`；`.git` 是目录 → `git-repo`；无 `.git` → `none`；`gitdir` 指向不存在 → `unknown` + warn。
 

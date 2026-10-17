@@ -361,7 +361,7 @@ cr → {存在共同问题?} --有--> (用户决定：完善约束还是接受�
 
 ## 10. 边界与不变量
 
-- 插件只读工作区里的**一个**约定路径（`Config.projectFlowPath`）：不删、不执行命令、不起子进程。**唯一的写**：用户两次确认（确认流程 → 逐节点选模型）后，由 `racing_code_init` 写 `Config.projectFlowPath` 这**一个**文件（`createIfAbsent`；`force` → `replaceIfVersion`），其余一切零写入；缺文件时**零段落**、只有该工具（`bootstrapEnabled` 可关）。
+- 插件只读工作区里的**一个**约定路径（`Config.projectFlowPath`）：不删、不执行命令、不起子进程。**唯一的写**：用户两次确认（确认流程 → 逐节点选模型）后，由 `racing_code_init` 写 `Config.projectFlowPath` 这**一个**文件（`createIfAbsent`；`force` → `replaceIfVersion`），其余一切零写入；缺文件时**零段落**、只有该工具（`bootstrapEnabled` 可关）。 另外，**代码里不得出现具体的阶段名或模型名**用于分支或文案：阶段与模型只有一个来源——项目流程文件的**声明**与**用户的选择**（模板默认图的阶段 id 只是那张图的定义，不是判断依据）。
 - 插件**不建 worktree、不合分支、不删分支**：`git worktree add/remove`、`git merge` 全部由编排者用 bash
   在阶段里做；插件只把"lane 必须隔离、worktree 放哪、结束后不许擅自删"讲清楚。
 - 插件**不代跑判定、不拦截委派、不掌握轮数**：分支、赛道、复盘轮与护栏靠提示段落 + 工具输出讲清楚，
