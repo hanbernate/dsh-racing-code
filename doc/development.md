@@ -5,7 +5,7 @@
 官方契约与失效症状在 [compatibility.md](compatibility.md)。
 
 交付物是**一个宿主半插件**（没有浏览器半），外加纯函数层、取源层与 bootstrap 纯函数层；
-v0.1.0（M0–M5）与 v0.2.0（M6–M8）均已实现。
+v0.1.0（M0–M5）与 v0.2.0（M6–M8）均已实现；M9–M11 是 v0.2.0 之上的语义修订（阶段按声明分流、判定=带建议的用户关口）。
 
 ---
 
@@ -70,6 +70,9 @@ dsh-racing-code/
 | **M6** | 契约与红测试 | `lib/bootstrap.js` 骨架 + `test/bootstrap.test.mjs` + host/flow/package 用例改动（契约提交 `30643ec`） | M5 | 中 | ✅ 完成（96 用例先红 25） |
 | **M7** | 双赛道 + CR + 复盘轮 | `racing/implement-a`（`9549c0c`）、`racing/implement-b`（`512f85a`→`2a4747c`）；CR 两轮 + `gate`/`confirm` 两个用户关口 | M6 | 大 | ✅ 完成（胜者 **implement-b**，已 cherry-pick 进 main） |
 | **M8** | 文档回填与收口 | 版本 0.2.0、README/locale/development 回填、真实新会话 e2e | M7 | 小 | ✅ 文档回填完成；e2e 三条 **待真实新会话实测** |
+| **M9** | 契约与红测试（按声明分流） | 执行按声明分流（无按阶段命名的例外）、判定=带建议的用户关口、渲染两种标记（设计/契约 `eb9a86b`/`e4905ba`/`208b845`/`c55d217`/`054cdce`） | M8 | 中 | ✅ 完成（先红后绿） |
+| **M10** | 双赛道 + CR + 用户判定 | `racing/implement-a`（`dce5ce4`→`3ef6d93`→`51b347e`）、`racing/implement-b`（`57358cc`→`82736ef`→`4074640`）；CR 三轮 + 用户两次判定（「A 通过」） | M9 | 大 | ✅ 完成（胜者 **implement-a**） |
+| **M11** | 合入 0.0.x 与文档回填 | 胜者按 `d86c5be`/`6b5d6ae`/`9f9ec78` 合入 `0.0.x`（**不直接落 `main`**），104/104 全绿；五个文档回填 | M10 | 小 | ✅ 文档回填完成；e2e 三条仍 **待真实新会话实测** |
 
 **M4 的边界**：用户在 2026-10-17 明确选择"先不跑双赛道"，所以"两条 lane + worktree + CR 复盘轮"这一段
 只有规程与提示词模板（[workflow-format.md](workflow-format.md) §5/§8/§11）与单元测试覆盖，**在 M4 时没有真实跑过**
@@ -144,7 +147,7 @@ lib/  test/           空目录，等 M1 起
 | `checkLabelShadowing(nodes, routes)` | 标签第二行**不是**路由（被忽略）而 front-matter 另有生效值 → `FLOW_LABEL_ROUTE_SHADOWED` |
 | `attachInstructions(nodes, markdown)` | 抽 `### <id>` 小节作为 `instruction`（只有阶段需要） |
 | `renderPolicySection(resolved)` | 紧凑图 + 路由 + 执行规则 + 复盘轮规则；**任何输入都返回非空字符串** |
-| `renderMermaid(resolved)` | 渲染"带模型的图"（路由填进标签；未配置标"用当前会话模型"，未授权标 ⚠），供 `flow_stages.mermaid` |
+| `renderMermaid(resolved)` | 渲染"带模型的图"（路由填进标签；未声明的非 lane 标"（在当前会话直接执行）"、lane 标"（用当前会话模型委派）"，未授权标 ⚠），供 `flow_stages.mermaid` |
 | `diagnose(problems)` | 诊断码 → 人话（含"改哪里"） |
 
 **验收**：`node --test test/flow.test.mjs` 全绿，至少覆盖：
@@ -308,6 +311,29 @@ lib/  test/           空目录，等 M1 起
 - 空池原因文案、根级目标 parent 假 blocked、`generatedOn` 不查日历真实性；
 - `generatedOn` 非法 / `cwd='/'` / `gitdir` 三条等 edge case 无直接测试用例；
 - e2e 三条待真实新会话实测（同上）。
+
+---
+
+## M9–M11. 按声明分流（v0.2.0 之上的修订，2026-10-17）
+
+**实测证据（本轮记录）**：
+
+| 检查 | 结果 |
+|---|---|
+| 设计与契约 | ✅ `eb9a86b`/`e4905ba`/`208b845`/`c55d217`/`054cdce`：阶段按声明分流（没有按阶段命名的例外）、判定=带建议的用户关口、渲染两种标记（先红后绿） |
+| 赛道 implement-a | ✅ `opencode-go/deepseek-v4.1-flash`：`dce5ce4`（round 1）→ `3ef6d93`（round 2）→ `51b347e`（round 3） |
+| 赛道 implement-b | ✅ `opencode-go/glm-5.3-flash`：`57358cc`（round 1）→ `82736ef`（round 2）→ `4074640`（round 3） |
+| CR | 三轮评审 + 用户两次判定（「A 通过」） |
+| 胜者 | **implement-a**，按 `d86c5be`/`6b5d6ae`/`9f9ec78` 合入当前工作分支 `0.0.x`（**不直接落 `main`**），`npm test` **104/104 全绿** |
+| 落败分支 | `racing/implement-b` **保留**（分支不删；落败 worktree 由收口清理） |
+| e2e | ⏳ 仍**待真实新会话实测**（新会话看引导、init 后新会话启用、只读沙箱 dryRun 降级） |
+
+**已接受/延后清单**（不再当阻塞项）：
+
+- implement-b 的 `stage.id.startsWith('implement-')` 两处按阶段名分支（违背不变量，落选**未合入**）；
+- lane 判定依赖 `buildLanes` 的实现细节；
+- 模板 brief 为静态文本；
+- 生成器与真实会话 e2e 三条仍待真实新会话实测。
 
 ---
 

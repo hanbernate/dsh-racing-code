@@ -139,9 +139,9 @@ A node's **shape** decides its kind ([full grammar and semantics](doc/workflow-f
 
 | Shape | Kind | Who runs it |
 |---|---|---|
-| `id["label<br/>provider · model"]` | **stage** | a delegated child; the optional second label line is its model |
+| `id["label<br/>provider · model"]` | **stage** | a declared model means a delegated child, no declaration means it runs in the current session; the optional second label line is its model |
 | `id{{"label"}}` | **parallel group** | not a stage: each of its out-edges starts a **lane** |
-| `id{"question"}` | **decision** | the orchestrator decides (runs tests, reads diffs) |
+| `id{"question"}` | **decision** | the model gives advice and evidence, **the user** decides (`ask_user_question`) |
 | `id(["label"])` | **user gate** | **the user** decides; the edge labels are the options offered |
 
 - A cyclic diagram needs a `%% entry: <node id>` line (without it, an ambiguous entry reports
@@ -202,8 +202,13 @@ through **two user interventions**:
    with `BOOTSTRAP_CHOICE_REQUIRED`, a `plan` with a blocked item with `BOOTSTRAP_PLAN_BLOCKED` → the flow
    takes effect only in a **new session** (`BOOTSTRAP_RESTART_REQUIRED`).
 
-**The `session` sentinel**: writing `design: session` in the models table means the user **has picked** "use the
-current session model" (`routeSource: 'session'`) and it does **not** report `FLOW_ROUTE_MISSING` — only a
+**Stages split by declaration**: a stage is delegated only when a model is declared for it; without a
+declaration (`session`/missing key) it runs directly in the current session. **Lanes always delegate** (a lane
+picking `session` means the child inherits the session model); `commit` delegates because the configuration
+declares a model for it.
+**The `session` sentinel**: writing `design: session` in the models table means the user **has picked** "declare
+no model" (`routeSource: 'session'`) — an undeclared non-lane stage runs directly in the current session, an
+undeclared lane delegates on the session model — and it does **not** report `FLOW_ROUTE_MISSING`; only a
 **missing key** does. Write safety: the target is pinned to `projectFlowPath`, writes outside the root are
 refused, unverifiable text never lands (zero-error self-check), preview is the default, and overwriting always
 takes an explicit `force`. Details: [doc/bootstrap.md](doc/bootstrap.md).
@@ -244,9 +249,11 @@ longer writes it for you.
 2. When enabled it registers one **system-prompt section** (order 700) on that root agent — file path, compact
    diagram, per-stage routes (unconfigured/unauthorized flagged), execution rules, review-round rules — and
    registers `flow_stages` **in the same agent scope**. Section text renders synchronously; no I/O.
-3. The orchestrator runs the diagram: a sequential stage is one foreground `subagent` call with an explicit
-   `provider`/`model` and a self-contained prompt; entering a **parallel group** launches every lane in one
-   message and waits for all of them before the join.
+3. The orchestrator runs the diagram: a sequential stage splits **by declaration** — with a declared model it
+   is one foreground `subagent` call with an explicit `provider`/`model` and a self-contained prompt, without
+   one it runs directly in the current session; **lanes always delegate**; `commit` delegates because the
+   configuration declares a model for it. Entering a **parallel group** launches every lane in one message and
+   waits for all of them before the join.
 4. Each lane works inside its own worktree and commits to its own branch; the CR reads every worktree, scores
    each take, triages **single-lane problems** vs **common problems**, and traces each common problem to the
    constraint it suggests is missing.

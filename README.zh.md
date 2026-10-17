@@ -130,9 +130,9 @@ flowchart TD
 
 | 形状 | 类型 | 谁执行 |
 |---|---|---|
-| `id["名称<br/>provider · model"]` | **阶段** | 委派一个子代理；标签第二行（可选）就是它的模型 |
+| `id["名称<br/>provider · model"]` | **阶段** | 声明了模型就委派一个子代理，没声明就在当前会话直接执行；标签第二行（可选）就是它的模型 |
 | `id{{"名称"}}` | **并行组（赛段）** | 不是阶段：它的每条出边开一条 **lane** |
-| `id{"问题"}` | **判定** | 编排者自己下结论（跑测试、看 diff） |
+| `id{"问题"}` | **判定** | 模型给建议与依据、**用户**下判断（`ask_user_question`） |
 | `id(["名称"])` | **用户关口** | **用户**下结论；出边的条件文字就是给用户的选项 |
 
 - 有回边的图要写一行 `%% entry: <节点 id>` 指明入口（候选不唯一又不写会报 `FLOW_AMBIGUOUS_ENTRY`）；
@@ -182,9 +182,12 @@ flowchart TD
    `force` 才走 `replaceIfVersion`）；赛道缺选拒写 `BOOTSTRAP_CHOICE_REQUIRED`，`plan` 有 blocked 拒写
    `BOOTSTRAP_PLAN_BLOCKED` → **新开会话**才生效（`BOOTSTRAP_RESTART_REQUIRED`）。
 
-**`session` 哨兵**：模型表里显式写 `design: session` = 用户**已选定**"用当前会话模型"（`routeSource: 'session'`），
-**不报** `FLOW_ROUTE_MISSING`——只有**缺键**才报。写入安全要点：目标钉死 `projectFlowPath`、越根拒绝、
-坏文本不落盘（自校验 0 error）、默认只预览、覆盖必须显式 `force`。细节见 [doc/bootstrap.md](doc/bootstrap.md)。
+**阶段按声明分流**：声明了模型才委派子代理，没声明（`session`/缺键）就在当前会话直接执行；
+**lane 永远委派**（lane 选 `session` = 子代理继承会话模型）；`commit` 委派是因为配置里声明了模型。
+**`session` 哨兵**：模型表里显式写 `design: session` = 用户**已选定**"不声明模型"（`routeSource: 'session'`）
+——非 lane 阶段在当前会话直接执行、lane 委派时用当前会话模型——**不报** `FLOW_ROUTE_MISSING`，只有**缺键**才报。
+写入安全要点：目标钉死 `projectFlowPath`、越根拒绝、坏文本不落盘（自校验 0 error）、默认只预览、
+覆盖必须显式 `force`。细节见 [doc/bootstrap.md](doc/bootstrap.md)。
 
 ## 6. 配置项
 
@@ -217,8 +220,9 @@ flowchart TD
 2. 启用时，它给这个 root agent 注册一条**系统提示段落**（order 700）：文件路径、紧凑图、每阶段路由
    （未配置/未授权会标出）、执行规则、复盘轮规则；并在**同一个 agent scope** 里注册 `flow_stages` 工具。
    段落是**同步渲染**的，不做 I/O。
-3. 编排者照图执行：顺序阶段一次前台 `subagent`（显式传 `provider`/`model`，提示词自包含）；
-   进入**并行组**时在一条消息里同时发起所有赛道，等它们全部结束才走汇合点。
+3. 编排者照图执行：顺序阶段按**声明**分流——声明了模型才委派（一次前台 `subagent`，显式传
+   `provider`/`model`，提示词自包含），没声明就在当前会话直接执行；**lane 永远委派**；`commit`
+   委派是因为配置里声明了模型。进入**并行组**时在一条消息里同时发起所有赛道，等它们全部结束才走汇合点。
 4. 每条赛道在自己的 worktree 里跑，做完提交到自己的分支；CR 读所有 worktree、逐条评审，
    分诊出"单赛道问题"与"共同问题"，并把共同问题追到"哪条约束没说清"。
 5. **复盘轮**：单赛道问题按赛道切分后 `send_message` 发回**该赛道原来的子代理**，它在原 worktree、
