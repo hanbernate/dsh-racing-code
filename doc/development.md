@@ -4,8 +4,8 @@
 格式与语义的规范在 [workflow-format.md](workflow-format.md)，设计依据在 [architecture.md](architecture.md)，
 官方契约与失效症状在 [compatibility.md](compatibility.md)。
 
-**当前仓库只有文档，没有任何代码。** 交付物是**一个宿主半插件**（没有浏览器半），
-外加一个纯函数层与一个取源层。
+交付物是**一个宿主半插件**（没有浏览器半），外加纯函数层、取源层与 bootstrap 纯函数层；
+v0.1.0（M0–M5）与 v0.2.0（M6–M8）均已实现。
 
 ---
 
@@ -14,8 +14,8 @@
 | | |
 |---|---|
 | **要做** | 读项目里的 `doc/racing-code.md` → 解析 mermaid 图与模型表 → 给该项目 root agent 注入系统提示段落 + 注册 `flow_stages` 工具；项目没声明就**什么都不做** |
-| **不做** | 不做 GUI、不做全局/内置流程、不委派、不建 worktree、不跑判定、不数轮次、不写工作区 |
-| **可以晚做** | `run_flow` 确定性执行器（v2）、"打印流程模板"的小工具（见 §8 未决） |
+| **不做** | 不做 GUI、不做全局/内置流程、不委派、不建 worktree、不跑判定、不数轮次、不写工作区（v0.2 起唯一例外：用户两次确认后由 `racing_code_init` 写 `projectFlowPath` 这一个文件） |
+| **可以晚做** | `run_flow` 确定性执行器（v2）；"打印流程模板"的小工具已落地为 `racing_code_init`（v0.2.0） |
 
 **总原则**（贯穿所有里程碑）：
 
@@ -67,9 +67,13 @@ dsh-racing-code/
 | **M3** | 宿主半 `lib/index.js` | Config、按 agent 注册段落与工具、缓存与热刷新 | M1 M2 | 中 | ✅ 完成（14 用例） |
 | **M4** | 端到端验收 | 安装/注册/段落进 prompt/热刷新/配置热生效/"没声明就不启用" | M3 | 中 | ✅ 完成（**赛道 e2e 按用户决定暂缓**，见下） |
 | **M5** | 文档回填 | README 状态、实测版本号、契约漂移、未决收敛 | M4 | 小 | ✅ 完成 |
+| **M6** | 契约与红测试 | `lib/bootstrap.js` 骨架 + `test/bootstrap.test.mjs` + host/flow/package 用例改动（契约提交 `30643ec`） | M5 | 中 | ✅ 完成（96 用例先红 25） |
+| **M7** | 双赛道 + CR + 复盘轮 | `racing/implement-a`（`9549c0c`）、`racing/implement-b`（`512f85a`→`2a4747c`）；CR 两轮 + `gate`/`confirm` 两个用户关口 | M6 | 大 | ✅ 完成（胜者 **implement-b**，已 cherry-pick 进 main） |
+| **M8** | 文档回填与收口 | 版本 0.2.0、README/locale/development 回填、真实新会话 e2e | M7 | 小 | ✅ 文档回填完成；e2e 三条 **待真实新会话实测** |
 
 **M4 的边界**：用户在 2026-10-17 明确选择"先不跑双赛道"，所以"两条 lane + worktree + CR 复盘轮"这一段
-只有规程与提示词模板（[workflow-format.md](workflow-format.md) §5/§8/§11）与单元测试覆盖，**没有真实跑过**；
+只有规程与提示词模板（[workflow-format.md](workflow-format.md) §5/§8/§11）与单元测试覆盖，**在 M4 时没有真实跑过**
+（M7 的真实双赛道 + CR 两轮已补齐这一段，见「M6–M8」小节）；
 其余验收项全部在真实会话里验过，证据见 §M4 的表。
 
 每个里程碑的**完成定义**：本节表格里的产物 +
@@ -278,6 +282,32 @@ lib/  test/           空目录，等 M1 起
   [architecture.md](architecture.md) §4/§9 同步（无浏览器半、无 GUI 的理由）与 §7 紧凑图示例；
 - ⏳ 未做（需要用户先拍板）：仓库**还不是 git 仓库**，所以流程里的"提交"目前只能做到收口
   （`doc/racing-code.md` 的 `### commit` 已写明这种情况怎么汇报）。
+  （后已解决：`0785b3a` 起仓库按 worktree 容器布局成为 git 仓库。）
+
+---
+
+## M6–M8. 新项目引导（bootstrap，v0.2.0，2026-10-17）
+
+设计与施工图见 [bootstrap.md](bootstrap.md)。**实测证据（本轮记录）**：
+
+| 检查 | 结果 |
+|---|---|
+| 契约先行 | ✅ `30643ec`：工具 `racing_code_init`、`session` 哨兵、两关协议的契约 + 96 用例（**先红 25**） |
+| 赛道 implement-a | ✅ `9549c0c`（`opencode-go/deepseek-v4.1-flash`）：96/96 全绿 |
+| 赛道 implement-b | ✅ `512f85a`（`opencode-go/glm-5.3-flash`）→ 复盘轮 `2a4747c`：96/96 全绿 |
+| CR round 1 | A 通过；B **1 条 blocking + 12 条共同问题** |
+| 用户关口 `gate` | **完善约束** → 十二条钉死写进设计（`259c9cd`） |
+| 用户关口 `confirm` | **发回修订** → B round 2（`2a4747c`）→ **CR round 2 通过** |
+| 胜者 | **implement-b**（评分依据：十二条钉死全兑现；A 有 3 条后钉缺口），已 cherry-pick 进 main（`aaef55c` + `408877e`） |
+| 落败分支 | `racing/implement-a` **保留**（worktree 不擅自删除），值得挑取 3 项：`loadCatalog` 按 provider 容错、每阶段说明非空断言、blocked 逐条报既有码 |
+| e2e | ⏳ 三条**待真实新会话实测**：新会话看引导、init 后新会话启用、只读沙箱 dryRun 降级 |
+
+**已接受/延后清单**（不再当阻塞项）：
+
+- `buildPlan` 收到原始 catalog：plan 会夸报候选池数量（两条赛道同）；
+- 空池原因文案、根级目标 parent 假 blocked、`generatedOn` 不查日历真实性；
+- `generatedOn` 非法 / `cwd='/'` / `gitdir` 三条等 edge case 无直接测试用例；
+- e2e 三条待真实新会话实测（同上）。
 
 ---
 
@@ -287,7 +317,7 @@ lib/  test/           空目录，等 M1 起
 |---|---|---|
 | 纯函数（解析/图校验/lane/回边/合并/渲染/诊断） | `node --test test/flow.test.mjs` | 无 DSH 依赖；**`doc/racing-code.md` 当夹具**防漂移 |
 | 取源与启用判定 | 假 `fs` 对象 | 覆盖 `missing / unreadable / invalid / ok` 四条路径 |
-| 宿主半注册 | 假 ctx 组装测试（照 [dsh-save-button/test/client-harness.mjs](</home/liumenghan/dsh-download-button/test/client-harness.mjs>) 的做法） | 断言：没文件时**零注册**；有文件时 section + tool 各注册一次、参数正确、disposer 干净 |
+| 宿主半注册 | 假 ctx 组装测试（照 [dsh-save-button/test/client-harness.mjs](</home/liumenghan/dsh-download-button/test/client-harness.mjs>) 的做法） | 断言：没文件时**只注册 `racing_code_init`**（`bootstrapEnabled: false` 时零注册）；有文件时 section + tool 各注册一次、参数正确、disposer 干净 |
 | 守卫 | `test/package.test.mjs` | 禁止 `require` 官方实现包；断言 `package.json` **没有** `dsh.client` |
 | 集成 | 装上去 + `cordis_inspect_query` + 新会话实测 | 见 M4；不使用也不假装官方集成测试框架 |
 
@@ -296,7 +326,7 @@ lib/  test/           空目录，等 M1 起
 ## 验证命令速查
 
 ```bash
-node --check lib/index.js lib/flow.js lib/sources.js
+node --check lib/index.js lib/flow.js lib/sources.js lib/bootstrap.js
 node --test
 node /home/liumenghan/deepseek-harness/apps/cli/lib/bin.js --profile web --dump-config | grep -A12 'racing-code'
 ```
@@ -321,13 +351,16 @@ plugin_manager        list_bundles / list_plugins
 | R7 | 模型腐烂（`mimo-v2.6-flash` 流式被挡、`big-pickle` 下线、`kilo` 要特殊头） | 图上写的路由跑不通 | 缺路由兜底为当前会话模型；白名单校验提前标出；文档记录基准线 |
 | R8 | 项目文件是唯一来源，写坏了就没流程 | 用户以为插件坏了 | 解析失败**必须**给诊断（M1 的底线测试 + M3 验收）；`flow_stages` 返回完整诊断 |
 | R9 | mermaid 子集解析是手写的 | 边角输入误判 | 每个 error 码一个反例 + 真实文件夹具；解析规则以 [workflow-format.md](workflow-format.md) 为准，改规范必须同时改测试 |
+| R10 | 模板三处同构漂移（`lib/bootstrap.js` 模板、[racing-code.md](racing-code.md)、README §5 示例） | 生成的流程与文档示例不一致 | 测试按"结构同构 + 0 error"断言、不做全文快照；改一处必须同步另两处 |
+| R11 | 只读沙箱拒写（`FS_SANDBOX_DENIED` 等） | 引导落不了盘 | `BOOTSTRAP_WRITE_FAILED` + 全文返回，两级降级：申请提权 / 手动创建；只预览不受影响 |
+| R12 | 生成器 bug 落盘半成品 | 项目拿到解析不了的流程文件 | 写前 `resolveFlow` 0-error 自校验（`BOOTSTRAP_TEMPLATE_INVALID` 拒写）；默认只预览 |
+| R13 | 行为变化被当回归（升级后缺文件会话的工具表多了 `racing_code_init`） | 用户以为插件坏了/越权 | README §3/§5 明写 v0.2 变化 + `bootstrapEnabled: false` 逃生口 |
 
 ## 未决（实现时拍板）
 
 1. `run_flow` 确定性执行器要不要做（v2；可架在 `ctx.workflowEngine` 之上，照 `tool-ralph` 的先例）；
 2. 三个护栏要不要硬强制（要挂 `session/event` 数轮次，与"插件不参与请求路径"冲突）；
-3. 要不要提供"新建流程文件 / 打印模板"的入口（一条命令，还是不做）；
-4. 流程文件名固定 `doc/racing-code.md`，还是支持候选链（如再找 `.dsh/racing-code.md`）；
-5. CR 报告要不要提供"落盘到 `doc/cr/<日期>.md`"的选项；
-6. 复盘轮要不要"逐赛道独立收敛"（通过的 lane 冻结）；
-7. CR 的评分标准/权重要不要让项目在流程文件里声明。
+3. 流程文件名固定 `doc/racing-code.md`，还是支持候选链（如再找 `.dsh/racing-code.md`）；
+4. CR 报告要不要提供"落盘到 `doc/cr/<日期>.md`"的选项；
+5. 复盘轮要不要"逐赛道独立收敛"（通过的 lane 冻结）；
+6. CR 的评分标准/权重要不要让项目在流程文件里声明。

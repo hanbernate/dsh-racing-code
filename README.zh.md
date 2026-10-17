@@ -1,6 +1,7 @@
 # dsh-racing-code
 
-> **状态：v0.1.0，已实现并装入本机 profile（`web`）。** 零依赖、零构建、宿主半 + 纯函数层，69 个测试全绿。
+> **状态：v0.2.0，已实现并装入本机 profile（`web`）。** 零依赖、零构建、宿主半 + 纯函数层，96 个测试全绿；
+> 新增**新项目首次引导**（bootstrap，见 §5 小节「新项目引导」）。
 > 安装、按 agent 注册段落与工具、段落真的进 prompt、改文件热刷新、改配置热生效、
 > "没声明就不启用"都已在真实会话里验过（证据见 [doc/development.md](doc/development.md) §M4）。
 
@@ -8,11 +9,12 @@
 
 **每个项目自己写一份流程 markdown**（里面用 mermaid 画工作流程，节点标签上直接写这个阶段用哪个模型）；
 插件解析它，把流程图注入该会话的系统提示，让主会话按图执行。
-**没有全局流程，也没有内置兜底**——项目里没有这份文件，插件在这个项目里就**完全不启用**。
+**没有全局流程，也没有内置兜底**——项目里没有这份文件，插件在这个项目里就**保持沉默**（不注入段落、
+不注册 `flow_stages`；唯一痕迹是用户显式启动引导时的 `racing_code_init` 工具，见 §5）。
 
 ```text
 <你的项目>/doc/racing-code.md      ← 唯一来源：阶段、顺序、并行赛道、分支、复盘轮、每阶段模型
-（没有这份文件 = 没有流程，插件不注入任何东西）
+（没有这份文件 = 没有流程，插件不注入任何东西，只留引导工具 racing_code_init）
 ```
 
 ### 最小上手
@@ -23,6 +25,7 @@ plugin_manager  install_bundle  /home/liumenghan/dsh-racing-code
 
 # 2) 在要用流程的项目里放一份流程图；本仓库自己那份可以直接抄
 mkdir -p doc && cp /home/liumenghan/dsh-racing-code/main/doc/racing-code.md doc/racing-code.md
+#    也可以直接对编排者说：给这个项目启动 racing-code（生成模板 → 确认流程 → 逐节点选模型）
 
 # 3) 会话里问一下现在生效的是什么（只读、现读现算）
 #    编排者会调 flow_stages，或直接读系统提示里的流程段落
@@ -72,9 +75,9 @@ mkdir -p doc && cp /home/liumenghan/dsh-racing-code/main/doc/racing-code.md doc/
 
 | 情况 | 插件行为 |
 |---|---|
-| 项目里**没有** `doc/racing-code.md` | **不启用**：不注入段落、不注册 `flow_stages`，会话里看不到任何痕迹 |
+| 项目里**没有** `doc/racing-code.md` | **沉默**：不注入段落、不注册 `flow_stages`；只有用户明确说「启动 racing-code」时才出现 `racing_code_init` 引导工具（`bootstrapEnabled: false` 可全关，见 §5） |
 | 文件存在、图能解析 | **启用**：注入流程段落 + 注册 `flow_stages` |
-| 文件存在、图写坏了 | **不注入流程**，只注入**一句诊断**（哪个诊断码、改哪里）；`flow_stages` 可查完整诊断 |
+| 文件存在、图写坏了 | **不注入流程**，只注入**一句诊断**（哪个诊断码、改哪里）；`flow_stages` 可查完整诊断，另有 `racing_code_init`（默认只预览，`force` 才覆盖坏文件） |
 
 - 文件名默认 `doc/racing-code.md`，可用插件配置 `projectFlowPath` 改；
 - **模型也在这份文件里**：节点标签第二行（`"实现 A<br/>opencode-go · deepseek-v4.1-flash"`）
@@ -165,6 +168,24 @@ flowchart TD
 常见调整：加第三条赛道（并行组再加一条出边 + 一个阶段，`maxLanes` 默认容得下 4 条）；把 CR 换更贵的模型；
 加严/放宽复盘轮；加"发布"关口。**换模型只改标签或 front-matter，不用动结构。**
 
+### 新项目引导（bootstrap，v0.2.0）
+
+项目还没有流程文件时插件**保持沉默**，但你可以直接对编排者说「**给这个项目启动 racing-code**」：
+它会调 `racing_code_init`（描述首句写死：仅当用户明确要求为本项目建立流程时调用；默认只预览、不写盘），
+**三步**走完**两次用户介入**：
+
+1. **预览**（`write: false`）：返回结构预览——mermaid 图 + 阶段清单 + 首次清单 + 前置检查 `plan`
+   + 逐节点选项 `nodes` + 九步 protocol；**所有阶段模型一律渲染成 `session`**，让结构先成为焦点；
+2. **两次介入**：① **确认流程**（预设 `full` / `minimal`、lane 数、阶段说明都可改）；
+   ② **逐节点确认模型**（选项卡：`用当前会话模型（默认）` + 白名单 ∩ llm 目录里的候选；**赛道必选**）；
+3. **写盘**（`write: true`）：写前 `resolveFlow` 0-error 自校验，默认 `createIfAbsent`（已存在不覆盖，
+   `force` 才走 `replaceIfVersion`）；赛道缺选拒写 `BOOTSTRAP_CHOICE_REQUIRED`，`plan` 有 blocked 拒写
+   `BOOTSTRAP_PLAN_BLOCKED` → **新开会话**才生效（`BOOTSTRAP_RESTART_REQUIRED`）。
+
+**`session` 哨兵**：模型表里显式写 `design: session` = 用户**已选定**"用当前会话模型"（`routeSource: 'session'`），
+**不报** `FLOW_ROUTE_MISSING`——只有**缺键**才报。写入安全要点：目标钉死 `projectFlowPath`、越根拒绝、
+坏文本不落盘（自校验 0 error）、默认只预览、覆盖必须显式 `force`。细节见 [doc/bootstrap.md](doc/bootstrap.md)。
+
 ## 6. 配置项
 
 行 id / 设置命名空间都是 `racing-code`。**没有设置页**（§7），所以这些字段直接写在 profile 补丁
@@ -173,6 +194,7 @@ flowchart TD
 | 字段 | 类型 | 默认 | 说明 |
 |---|---|---|---|
 | `enabled` | boolean | `true` | 总开关（想临时全关时用） |
+| `bootstrapEnabled` | boolean | `true` | 新项目引导总开关：false 时连"没文件"也**完全沉默**（不注册 `racing_code_init`） |
 | `projectFlowPath` | string | `doc/racing-code.md` | 唯一来源，相对项目根 |
 | `maxStageRepeats` | number | `3` | 回边护栏默认值（可被 front-matter 覆盖） |
 | `maxLanes` | number | `4` | 一个并行赛段最多几条 lane（可被 front-matter 覆盖） |
@@ -190,7 +212,7 @@ flowchart TD
 ## 8. 运行时到底发生什么
 
 1. 会话创建时，宿主半拿 `agent.session.header.cwd`（项目根），读 `<项目根>/doc/racing-code.md`：
-   没有 → **什么都不做**；有 → 解析图、合并路由（图内标注 > front-matter > 当前会话模型）、
+   没有 → **保持沉默**（只注册 `racing_code_init` 引导工具，见 §5）；有 → 解析图、合并路由（图内标注 > front-matter > 当前会话模型）、
    校验白名单与 CR 复用，缓存住（last-known-good）。
 2. 启用时，它给这个 root agent 注册一条**系统提示段落**（order 700）：文件路径、紧凑图、每阶段路由
    （未配置/未授权会标出）、执行规则、复盘轮规则；并在**同一个 agent scope** 里注册 `flow_stages` 工具。
@@ -215,7 +237,7 @@ flowchart TD
 plugin_manager  install_bundle  /home/liumenghan/dsh-racing-code
 ```
 
-**装完什么都不会发生**——直到某个项目声明了自己的流程。要试一下：
+**装完什么都不会发生**——直到某个项目声明了自己的流程（或者你显式说「给这个项目启动 racing-code」走引导，见 §5）。要试一下：
 
 ```bash
 mkdir -p doc && cp <本仓库>/doc/racing-code.md doc/racing-code.md    # 或者自己写一份
@@ -245,17 +267,19 @@ mkdir -p doc && cp <本仓库>/doc/racing-code.md doc/racing-code.md    # 或者
     ├── package.json                    # dsh.bundle.patch（**没有** dsh.client：本插件没有浏览器半）
     ├── cordis.patch.yml                # 插入宿主行 racing-code（含 §6 的默认值）
     ├── lib/
-    │   ├── index.js                    # 宿主半：Config（~standard）、按 agent 注册段落与工具、缓存/热刷新/teardown
+    │   ├── index.js                    # 宿主半：Config（~standard）、按 agent 注册段落与工具（含 racing_code_init）、缓存/热刷新/teardown
     │   ├── flow.js                     # 纯函数：YAML/mermaid 子集解析、图校验、lane/join、回边、路由合并、渲染、诊断
+    │   ├── bootstrap.js                # 引导纯函数：full/minimal 模板、逐节点选项、前置 plan、九步协议
     │   └── sources.js                  # 取源：读项目流程图、启用判定（disabled/missing/unreadable/invalid/ok）、fs.watch
     ├── locale/                         # 插件卡片标题/描述（zh + en）
     ├── doc/
     │   ├── racing-code.md              # 本仓库自己的流程（唯一来源的活样例）
+    │   ├── bootstrap.md                # 新项目引导：设计与施工图（v0.2.0）
     │   ├── workflow-format.md          # 流程文件格式规范（唯一权威）
     │   ├── architecture.md             # 维护者视角：为什么长这样、扩展点依据、数据流
     │   ├── compatibility.md            # 依赖的官方契约清单与失效症状
     │   └── development.md              # 开发计划：里程碑、接口契约、验收、实测证据、风险
-    ├── test/                           # node --test：flow / sources / host / package 四组，69 个用例
+    ├── test/                           # node --test：flow / sources / bootstrap / host / package 五组，96 个用例
     ├── README.md                       # 英文
     └── README.zh.md                    # 本文
 ```
@@ -298,7 +322,6 @@ mkdir -p doc && cp <本仓库>/doc/racing-code.md doc/racing-code.md    # 或者
    v2 的 `run_flow` 可以让插件按图驱动子代理；官方 `tool-ralph` 是现成先例（"an ordinary plugin over
    `ctx.workflowEngine` and `ctx.subagents`"），可以把图编译成 workflow 脚本。
 2. **护栏要不要硬？** `maxStageRepeats` / `maxLanes` / `maxReviewRounds` 现在只是提示词规则。
-3. **要不要提供"新建流程文件"的入口？** 现在完全靠人/模型在项目里创建（可选形态：一条命令打印模板）。
-4. **CR 之后要不要"取长补短"？** 现在是"反馈改到全部通过 → 选胜者 + 保留落败分支供人挑取"。
-5. **落败 worktree 谁清理？** 现在是 `commit` 阶段清理目录、保留分支。
-6. **复盘轮要不要逐赛道独立收敛？** 现在是"一条不通过就整轮再评（只重跑被点名的赛道）"。
+3. **CR 之后要不要"取长补短"？** 现在是"反馈改到全部通过 → 选胜者 + 保留落败分支供人挑取"。
+4. **落败 worktree 谁清理？** 现在是 `commit` 阶段清理目录、保留分支。
+5. **复盘轮要不要逐赛道独立收敛？** 现在是"一条不通过就整轮再评（只重跑被点名的赛道）"。

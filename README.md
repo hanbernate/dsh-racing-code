@@ -1,7 +1,8 @@
 # dsh-racing-code
 
-> **Status: v0.1.0 — implemented and installed in this machine's `web` profile.** Zero dependencies, no build,
-> host half plus a pure layer, 69 tests green. Installation, per-agent registration of the section and the tool,
+> **Status: v0.2.0 — implemented and installed in this machine's `web` profile.** Zero dependencies, no build,
+> host half plus a pure layer, 96 tests green; new in this release: **first-run bootstrap for new projects**
+> (see the "New-project bootstrap" subsection in §5). Installation, per-agent registration of the section and the tool,
 > the section actually reaching the prompt, live refresh on file edits, live reload of the Config, and
 > "not declared → not enabled" were all verified in a real session
 > (evidence in [doc/development.md](doc/development.md) §M4).
@@ -12,7 +13,8 @@ its notes back to the lanes until they pass.**
 **Each project writes its own flow markdown** (the workflow drawn as a mermaid diagram, with each stage's model
 written right on the node label). The plugin parses it, injects the diagram into that session's system prompt,
 and lets the main session run it. **There is no global flow and no built-in fallback** — if a project has no such
-file, the plugin is **not enabled at all** for that project.
+file, the plugin **stays silent** for that project (no prompt section, no `flow_stages`; its only trace is the
+`racing_code_init` bootstrap tool you invoke explicitly — see §5).
 
 ### Quick start
 
@@ -22,6 +24,7 @@ plugin_manager  install_bundle  /home/liumenghan/dsh-racing-code
 
 # 2) give the project a flow; this repository's own file is a good starting point
 mkdir -p doc && cp /home/liumenghan/dsh-racing-code/main/doc/racing-code.md doc/racing-code.md
+#    or just tell the orchestrator: start racing-code for this project (template -> confirm flow -> pick models)
 
 # 3) ask what is in force (read-only, re-read from disk):
 #    the orchestrator calls flow_stages, and the system prompt carries the same flow
@@ -33,7 +36,7 @@ diagram mentions must be added to the allowlist **by hand** in
 
 ```text
 <your project>/doc/racing-code.md      ← the only source: stages, order, lanes, branches, review rounds, models
-(no file = no flow; the plugin injects nothing)
+(no file = no flow; the plugin injects nothing, only the racing_code_init bootstrap tool remains)
 ```
 
 Grammar and semantics: [doc/workflow-format.md](doc/workflow-format.md). Rationale:
@@ -78,9 +81,9 @@ missing and where to add it — but **the GUI no longer merges it for you** (see
 
 | Situation | Plugin behaviour |
 |---|---|
-| The project has **no** `doc/racing-code.md` | **Not enabled**: no prompt section, no `flow_stages`; nothing of the plugin appears in the session |
+| The project has **no** `doc/racing-code.md` | **Silent**: no prompt section, no `flow_stages`; the `racing_code_init` bootstrap tool appears only when you explicitly say "start racing-code" (`bootstrapEnabled: false` turns even that off, see §5) |
 | The file exists and the diagram parses | **Enabled**: inject the flow section and register `flow_stages` |
-| The file exists but the diagram is broken | **No flow injected** — only **one diagnostic line**; `flow_stages` returns the full diagnostics |
+| The file exists but the diagram is broken | **No flow injected** — only **one diagnostic line**; `flow_stages` returns the full diagnostics, and `racing_code_init` is registered too (preview only by default; `force` replaces the broken file) |
 
 - The path defaults to `doc/racing-code.md` and is configurable via `projectFlowPath`;
 - **models live in the same file**: the second line of a stage's node label
@@ -181,6 +184,30 @@ Typical edits: add a third lane (one more out-edge plus one more stage; `maxLane
 CR at a stronger model; tighten or loosen the review loop; add a release gate. **To change models, edit labels or
 front matter only — never the structure.**
 
+### New-project bootstrap (v0.2.0)
+
+With no flow file yet the plugin **stays silent**, but you can simply tell the orchestrator **"start racing-code for
+this project"**: it calls `racing_code_init` (whose first description sentence is fixed: call only when the user
+explicitly asks to set up a flow for this project; preview only, never writes by default) and walks **three steps**
+through **two user interventions**:
+
+1. **Preview** (`write: false`): a structural preview — mermaid diagram, stage list, first-run checklist, pre-flight
+   `plan`, per-node `nodes` choices and the nine-step protocol — with **every stage model rendered as
+   `session`**, so the structure stays the focus;
+2. **Two interventions**: ① **confirm the flow** (presets `full` / `minimal`, lane count, stage briefs are all
+   editable); ② **confirm each node's model** (tabs: `use the current session model (default)` plus the
+   allowlist ∩ llm catalog candidates; **lanes are required picks**);
+3. **Write** (`write: true`): a `resolveFlow` zero-error self-check first, `createIfAbsent` by default (an
+   existing file is not overwritten; `force` takes `replaceIfVersion`); missing lane choices refuse the write
+   with `BOOTSTRAP_CHOICE_REQUIRED`, a `plan` with a blocked item with `BOOTSTRAP_PLAN_BLOCKED` → the flow
+   takes effect only in a **new session** (`BOOTSTRAP_RESTART_REQUIRED`).
+
+**The `session` sentinel**: writing `design: session` in the models table means the user **has picked** "use the
+current session model" (`routeSource: 'session'`) and it does **not** report `FLOW_ROUTE_MISSING` — only a
+**missing key** does. Write safety: the target is pinned to `projectFlowPath`, writes outside the root are
+refused, unverifiable text never lands (zero-error self-check), preview is the default, and overwriting always
+takes an explicit `force`. Details: [doc/bootstrap.md](doc/bootstrap.md).
+
 ## 6. Configuration
 
 The Loader row id and settings namespace are both `racing-code`. There is **no settings page** (§7), so these
@@ -189,6 +216,7 @@ fields are edited in the profile patch's `racing-code` row `config` (defaults sh
 | Field | Type | Default | Meaning |
 |---|---|---|---|
 | `enabled` | boolean | `true` | master switch (turn everything off temporarily) |
+| `bootstrapEnabled` | boolean | `true` | master switch for the new-project bootstrap: `false` keeps even the "no file" case **fully silent** (no `racing_code_init`) |
 | `projectFlowPath` | string | `doc/racing-code.md` | the only source, relative to the project root |
 | `maxStageRepeats` | number | `3` | default back-edge guard (overridable in front matter) |
 | `maxLanes` | number | `4` | max lanes per parallel group (overridable in front matter) |
@@ -209,7 +237,8 @@ longer writes it for you.
 ## 8. Runtime behaviour
 
 1. When a session's agent is created, the host half reads `<project root>/doc/racing-code.md` using
-   `agent.session.header.cwd`: missing → **do nothing at all**; present → parse the diagram, merge routes (label >
+   `agent.session.header.cwd`: missing → **stay silent** (only the `racing_code_init` bootstrap tool, see §5);
+   present → parse the diagram, merge routes (label >
    front matter > current session model), check the allowlist and CR-model reuse, and cache the result
    (last-known-good).
 2. When enabled it registers one **system-prompt section** (order 700) on that root agent — file path, compact
@@ -238,7 +267,8 @@ longer writes it for you.
 plugin_manager  install_bundle  /home/liumenghan/dsh-racing-code
 ```
 
-**Nothing happens after installing** — until a project declares its flow. To try it:
+**Nothing happens after installing** — until a project declares its flow (or you explicitly say "start racing-code
+for this project" and walk the bootstrap, see §5). To try it:
 
 ```bash
 mkdir -p doc && cp <this repo>/doc/racing-code.md doc/racing-code.md    # or write your own
@@ -263,11 +293,12 @@ tree but a container holding the bare repository plus one directory per branch.
 ├── .git                                a file containing: gitdir: ./.bare
 └── main/                               the worktree for branch main — the tree below lives inside it
     ├── package.json      cordis.patch.yml      locale/{zh,en}.json
-    ├── lib/index.js      # host half: ~standard Config, per-agent section + tool, cache/refresh/teardown
+    ├── lib/index.js      # host half: ~standard Config, per-agent section + tools (incl. racing_code_init), cache/refresh/teardown
     ├── lib/flow.js       # pure layer: mermaid/YAML subset, graph rules, lanes, loops, routes, rendering
+    ├── lib/bootstrap.js  # bootstrap pure layer: full/minimal templates, node choices, pre-flight plan, protocol
     ├── lib/sources.js    # source layer: read, enablement (disabled/missing/unreadable/invalid/ok), watch
-    ├── test/             # node --test: flow / sources / host / package (69 cases)
-    └── doc/{racing-code.md, workflow-format.md, architecture.md, compatibility.md, development.md}
+    ├── test/             # node --test: flow / sources / bootstrap / host / package (96 cases)
+    └── doc/{racing-code.md, bootstrap.md, workflow-format.md, architecture.md, compatibility.md, development.md}
 ```
 
 There is no client half: no `dsh.client`, no bundle, no settings page (§7).
@@ -312,7 +343,6 @@ Two consequences of that layout:
    precedent ("an ordinary plugin over `ctx.workflowEngine` and `ctx.subagents`"), so the diagram could be
    compiled into a workflow script instead of managing subprocesses ourselves.
 2. Should the guards (`maxStageRepeats`, `maxLanes`, `maxReviewRounds`) be enforced rather than advisory?
-3. Should there be an entry point that creates a flow file (today only a human or the model creates it)?
-4. Should the CR synthesize a third branch from the lanes' strengths (v2)?
-5. Who cleans up losing worktrees — the `commit` stage (today) or the user?
-6. Should review rounds converge per lane (freeze the ones that pass) instead of re-reviewing the whole field?
+3. Should the CR synthesize a third branch from the lanes' strengths (v2)?
+4. Who cleans up losing worktrees — the `commit` stage (today) or the user?
+5. Should review rounds converge per lane (freeze the ones that pass) instead of re-reviewing the whole field?

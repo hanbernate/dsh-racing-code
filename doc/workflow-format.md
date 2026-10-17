@@ -310,6 +310,7 @@ commit: kilo/kilo-auto/free
   **并行组、判定、用户关口不需要路由**；
 - 出现图里没有的 id → 只警告 `FLOW_MODEL_UNKNOWN_STAGE`；
 - 阶段缺路由 → 用**当前会话模型**兜底 + 在会话里明确提示（§1.2 第 3 条）；
+- **关键字 `session`**：显式写 `design: session` = 用户已选「用当前会话模型」（`routeSource: 'session'`），**不报** `FLOW_ROUTE_MISSING`；只有**缺键**才报 missing（漏配 ≠ 显式选择）。
 - **CR 的模型不应与任何 lane 相同**（自评会有偏好）：命中就警告 `FLOW_CR_MODEL_REUSED`；
 - 路由是否在子代理**白名单**内由插件单独校验：不在 → 标 `未授权`，并在会话里告诉你**缺哪一条、加到哪里**
   （内置 Subagent 设置页）。多条 lane 意味着**白名单至少要有这么多条可用路由**——这条要在开跑前就看到；
@@ -424,6 +425,19 @@ CR 的结论**不是**"选一个赢家"就结束，而是一个闭环：
 `info`/`warn` 只提示；`error` 让文件作废（不启用流程）。诊断的送达位置：
 **系统提示段落里一句话** + `flow_stages` 的 `diagnostics[]`（没有 GUI，诊断只走会话）。
 
+`racing_code_init`（引导工具）自己的诊断码走**工具输出**（不在上表；写入安全见 [bootstrap.md](bootstrap.md) §5）：
+
+| 码 | 级别 | 触发 |
+|---|---|---|
+| `BOOTSTRAP_FILE_EXISTS` | warn | 目标已存在且未 `force` |
+| `BOOTSTRAP_TEMPLATE_INVALID` | error | 生成文本自校验没过（生成器红线） |
+| `BOOTSTRAP_TARGET_OUTSIDE_ROOT` | error | 目标逃出项目根 |
+| `BOOTSTRAP_PARENT_MISSING` / `BOOTSTRAP_PLAN_BLOCKED` | error | 父目录缺失 / plan 含 blocked 项（写前拒写） |
+| `BOOTSTRAP_WRITE_CONFLICT` / `BOOTSTRAP_WRITE_FAILED` | warn/error | 版本冲突 / fs 写失败（含沙箱拒绝） |
+| `BOOTSTRAP_CHOICE_REQUIRED` | error | write:true 时赛道还没选模型 |
+| `BOOTSTRAP_NO_CANDIDATES` / `BOOTSTRAP_CR_REUSE_RISK` | warn | 候选池为空 / CR 自评偏好提示 |
+| `BOOTSTRAP_RESTART_REQUIRED` | info | 写入成功，新开会话生效 |
+
 ## 10. 写完自查
 
 - [ ] 图里恰好一个起点，所有阶段都能从起点走到；
@@ -442,6 +456,7 @@ CR 的结论**不是**"选一个赢家"就结束，而是一个闭环：
 - [ ] 分支/用户关口的条件文字都写得能被回答（"测试全绿?" 而不是 "好不好?"）；
 - [ ] 每个阶段要么在模型表里（图内标注或 front-matter）有路由，要么接受"用当前会话模型兜底"；
 - [ ] 路由都在子代理白名单里（否则会话里会报"未授权"，缺的那条要先加到内置 Subagent 设置页）。
+- [ ] 用引导生成的文件：核对**首次清单**（git/lane 目录、白名单路由、新开会话）都已处理。
 
 ## 11. lane 提示词模板（给编排者用）
 

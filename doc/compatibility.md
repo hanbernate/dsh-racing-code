@@ -142,7 +142,7 @@ profile `web`，`patchReload: live`，时间 2026-10-17。
 ### 1.9 `ctx.get('llm')`：llm 目录（bootstrap 模型选项卡的候选来源）
 
 - **依赖**：`llm` 服务的 `listProviders(): LlmProviderInfo[]`（同步）与 `await listModels(providerId): LlmModelInfo[]`
-  （`LlmModelInfo = { provider, id, name, description? }`）。`racing_code_init` 的候选池 = 子代理白名单 ∩ 该目录。
+  （`LlmModelInfo = { provider, id, name, description? }`）。`racing_code_init` 的候选池 = 子代理白名单 ∩ 该目录。 **字段契约**（CR 复评补）：`listProviders(): {id: string}[]`（同步）、`listModels(providerId): Promise<{id: string, description?: string}[]>`；映射为 `{provider: id, model: model.id, note: description?}`。字段不符时防御式降级为空池 + warn（不崩）。
 - **核实**：CR 阶段在 /home/liumenghan/deepseek-harness 实证（`packages/llm` 的 api-catalog 与 types）；
   本机目录由 profile 的 `llm-pi-ai` providers 配置提供（opencode-go / kilo）。
 - **降级**：`ctx.get('llm')` 不可用或字段缺失 → 候选为空 + `BOOTSTRAP_NO_CANDIDATES`（选项卡只剩"用会话模型"）；
