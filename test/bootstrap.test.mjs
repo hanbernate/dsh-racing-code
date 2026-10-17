@@ -295,3 +295,15 @@ test('bootstrap_protocol_has_two_gates', () => {
   assert.notEqual(bootstrapProtocol({ file, lanes: 3 }).join('\n'), bootstrapProtocol({ file, lanes: 2 }).join('\n'),
     'the protocol must use the lane count it was given')
 })
+
+test('template_briefs_state_the_route_split_and_the_gate_protocol', () => {
+  const text = renderBootstrapTemplate({ template: 'full', lanes: 2 })
+  const brief = id => text.split('### ' + id)[1].split('### ')[0]
+  assert.match(brief('design'), /在当前会话直接执行/)
+  assert.match(brief('contract-tests'), /在当前会话直接执行/)
+  assert.match(brief('cr'), /建议/)
+  assert.match(brief('cr'), /完整材料/)
+  assert.match(brief('commit'), /合入当前工作分支/)
+  assert.match(text, /commit 阶段永远委派/)
+  assert.match(text, /lane 永远委派/)
+})

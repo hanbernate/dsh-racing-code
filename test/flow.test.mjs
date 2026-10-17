@@ -471,12 +471,60 @@ test('session_sentinel_marks_route_source', () => {
   assert.ok(resolved.problems.some(problem => problem.code === 'FLOW_ROUTE_MISSING' && problem.node === 'b'))
 })
 
-test('session_sentinel_renders_session_model', () => {
+const LANE_SESSION_GRAPH = [
+  'flowchart TD',
+  '  %% entry: start',
+  '  start["Start"] --> race{{"Race"}}',
+  '  race --> lane-a["Lane A"]',
+  '  race --> lane-b["Lane B"]',
+  '  lane-a --> cr["CR"]',
+  '  lane-b --> cr',
+  '  cr --> done["Done"]',
+]
+
+test('session_sentinel_runs_in_session_for_a_non_lane_stage', () => {
   const flow = doc(['racing-code: 1', 'models:', '  a: session'], ['flowchart TD', '  a["A"] --> b["B"]'])
   const resolved = resolveFlow(flow, {})
   const section = renderPolicySection({ ...resolved, file: '/tmp/doc/racing-code.md' })
-  assert.match(section, /a=（用当前会话模型）/)
-  assert.match(renderMermaid(resolved), /（用当前会话模型）/)
+  assert.match(section, /a=（在当前会话直接执行）/, 'a session route on a non-lane stage runs here, not in a child')
+  assert.match(renderMermaid(resolved), /（在当前会话直接执行）/)
+})
+
+test('session_sentinel_inside_a_lane_still_delegates', () => {
+  const models = ['racing-code: 1', 'models:', '  start: kilo/kilo-auto/free', '  lane-a: session',
+    '  lane-b: kilo/kilo-auto/free', '  cr: kilo/kilo-auto/free', '  done: kilo/kilo-auto/free']
+  const section = renderPolicySection(resolveFlow(doc(models, LANE_SESSION_GRAPH), {}))
+  assert.match(section, /lane-a=（用当前会话模型委派）/, 'a lane keeps its own subagent and inherits the session model')
+})
+
+test('rules_text_splits_execution_by_route', () => {
+  const section = renderPolicySection(resolveFlow(doc(null, ['flowchart TD', '  a["A"] --> b["B"]']), {}))
+  assert.match(section, /在当前会话直接执行/)
+  assert.match(section, /commit 阶段永远委派/)
+  assert.match(section, /lane 永远委派/)
+})
+
+test('rules_text_merges_decisions_into_user_gates', () => {
+  const graph = ['flowchart TD', '  a["A"] --> v{"ok?"}', '  v -- "yes" --> d["D"]', '  v -- "no" --> a']
+  const section = renderPolicySection(resolveFlow(doc(null, graph), {}))
+  assert.match(section, /判定与用户关口同语义/)
+  assert.match(section, /先给建议与依据/)
+  assert.match(section, /完整材料/)
+  assert.match(section, /等待给足/)
+})
+
+test('route_missing_message_points_at_in_session_execution', () => {
+  const flow = doc(['racing-code: 1', 'models:', '  b: kilo/kilo-auto/free'], ['flowchart TD', '  a["A"] --> b["B"]'])
+  const missing = resolveFlow(flow, {}).problems.find(p => p.code === 'FLOW_ROUTE_MISSING' && p.node === 'a')
+  assert.match(missing.message, /在当前会话直接执行/)
+})
+
+test('route_missing_message_for_a_lane_keeps_delegation', () => {
+  const models = ['racing-code: 1', 'models:', '  start: kilo/kilo-auto/free',
+    '  lane-b: kilo/kilo-auto/free', '  cr: kilo/kilo-auto/free', '  done: kilo/kilo-auto/free']
+  const missing = resolveFlow(doc(models, LANE_SESSION_GRAPH), {})
+    .problems.find(p => p.code === 'FLOW_ROUTE_MISSING' && p.node === 'lane-a')
+  assert.match(missing.message, /委派时用当前会话模型/)
 })
 
 test('malformed_route_still_warns', () => {
