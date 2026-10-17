@@ -499,9 +499,21 @@ test('session_sentinel_inside_a_lane_still_delegates', () => {
 
 test('rules_text_splits_execution_by_route', () => {
   const section = renderPolicySection(resolveFlow(doc(null, ['flowchart TD', '  a["A"] --> b["B"]']), {}))
+  assert.match(section, /声明/)
+  assert.match(section, /provider\/model/)
   assert.match(section, /在当前会话直接执行/)
-  assert.match(section, /commit 阶段永远委派/)
   assert.match(section, /lane 永远委派/)
+  assert.doesNotMatch(section, /commit 阶段永远委派/, 'no stage-name exception in code')
+})
+
+test('commit_id_is_not_special_cased', () => {
+  const flow = doc(null, ['flowchart TD', '  a["A"] --> commit["Commit"]'])
+  const resolved = resolveFlow(flow, {})
+  const section = renderPolicySection({ ...resolved, file: '/tmp/doc/racing-code.md' })
+  assert.match(section, /commit=（在当前会话直接执行）/, 'the id must not decide the execution')
+  assert.match(renderMermaid(resolved), /（在当前会话直接执行）/)
+  const missing = resolved.problems.find(p => p.code === 'FLOW_ROUTE_MISSING' && p.node === 'commit')
+  assert.match(missing.message, /在当前会话直接执行/)
 })
 
 test('rules_text_merges_decisions_into_user_gates', () => {
