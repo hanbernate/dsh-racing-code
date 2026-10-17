@@ -5,7 +5,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
   attachInstructions, buildFlow, buildLanes, buildLoops, checkAuthorized, checkLabelShadowing,
-  checkReviewer, classifyBackEdges, classifyEdges, diagnose, mergeRoutes, parseFrontMatter,
+  checkReviewer, classifyBackEdges, classifyEdges, diagnose, laneAgentName, laneAgentNameLine,
+  mergeRoutes, parseFrontMatter,
   parseMermaid, parseNodeLabel, parseYamlSubset, renderMermaid, renderPolicySection, resolveEntry,
   resolveFlow, summarize,
 } from '../lib/flow.js'
@@ -611,6 +612,47 @@ test('renderPolicySection: never empty, and carries the diagram, routes and rule
   assert.match(text, /\[race:/)
   assert.match(text, /worktree/)
   assert.match(text, /send_message/)
+})
+
+test('laneAgentName: <stem>-<model>, dropping a trailing single-letter lane ordinal', () => {
+  assert.equal(
+    laneAgentName('implement-a', { provider: 'opencode-go', model: 'deepseek-v4.1-flash' }),
+    'implement-deepseek-v4.1-flash')
+  assert.equal(
+    laneAgentName('implement-b', { provider: 'opencode-go', model: 'glm-5.3-flash' }),
+    'implement-glm-5.3-flash')
+})
+
+test('laneAgentName: no ordinal, multi-hyphen ids and single letters keep a real stem', () => {
+  assert.equal(laneAgentName('frontend', { model: 'glm-5.3-flash' }), 'frontend-glm-5.3-flash')
+  assert.equal(laneAgentName('foo-bar-a', { model: 'm' }), 'foo-bar-m')
+  assert.equal(laneAgentName('implement-x1', { model: 'm' }), 'implement-x1-m')
+  assert.equal(laneAgentName('a', { model: 'm' }), 'a-m')
+})
+
+test('laneAgentName: a lane on the session model gets the session suffix', () => {
+  assert.equal(laneAgentName('implement-a', null), 'implement-session')
+  assert.equal(laneAgentName('implement-a', undefined), 'implement-session')
+  assert.equal(laneAgentName('implement-a', { provider: 'opencode-go' }), 'implement-session')
+})
+
+test('laneAgentNameLine: one lane-id=name per lane stage, in declaration order', () => {
+  const line = laneAgentNameLine(resolveFlow(REAL, {}).stages)
+  assert.match(line, /^子代理显示名：/)
+  assert.match(line, /implement-a=implement-deepseek-v4\.1-flash/)
+  assert.match(line, /implement-b=implement-glm-5\.3-flash/)
+})
+
+test('laneAgentNameLine: a flow without lanes has no name line', () => {
+  assert.equal(laneAgentNameLine(resolveFlow(doc(null, LINEAR), {}).stages), '')
+  assert.equal(laneAgentNameLine([]), '')
+})
+
+test('renderPolicySection: the parallel-group rule pins the lane subagent name to its model', () => {
+  const text = renderPolicySection({ ...resolveFlow(REAL, {}), file: '/tmp/doc/racing-code.md' })
+  assert.match(text, /子代理显示名/)
+  assert.match(text, /词干/)
+  assert.match(text, /description/)
 })
 
 test('renderMermaid: round-trips — the rendering is itself a valid flow document', () => {

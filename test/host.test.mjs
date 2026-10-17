@@ -318,6 +318,7 @@ test('flow_stages answers from disk: whole flow, one stage, unknown stage, bad a
   assert.match(whole.summary, /入口 start/)
   assert.match(whole.details, /```mermaid/)
   assert.match(whole.details, /racing\/lane-a/)
+  assert.match(whole.details, /子代理显示名：lane-a=lane-kilo-auto\/free/)
   assert.deepEqual(whole.problems, [])
 
   const one = await tool.execute({ stage: 'cr' }, exec)

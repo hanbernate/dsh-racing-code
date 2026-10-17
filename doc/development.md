@@ -146,7 +146,8 @@ lib/  test/           空目录，等 M1 起
 | `checkReviewer(routes, lanes)` | CR 与任一 lane 同模型 → `FLOW_CR_MODEL_REUSED` |
 | `checkLabelShadowing(nodes, routes)` | 标签第二行**不是**路由（被忽略）而 front-matter 另有生效值 → `FLOW_LABEL_ROUTE_SHADOWED` |
 | `attachInstructions(nodes, markdown)` | 抽 `### <id>` 小节作为 `instruction`（只有阶段需要） |
-| `renderPolicySection(resolved)` | 紧凑图 + 路由 + 执行规则 + 复盘轮规则；**任何输入都返回非空字符串** |
+| `renderPolicySection(resolved)` | 紧凑图 + 路由 + 执行规则（含赛道子代理显示名 `<词干>-<model>`）+ 复盘轮规则；**任何输入都返回非空字符串** |
+| `laneAgentName(laneId, route)` | 赛道子代理显示名 `<词干>-<model>`（[workflow-format.md](workflow-format.md) §5.3）；`laneAgentNameLine(stages)` 渲染 `flow_stages` 的「子代理显示名」行 |
 | `renderMermaid(resolved)` | 渲染"带模型的图"（路由填进标签；未声明的非 lane 标"（在当前会话直接执行）"、lane 标"（用当前会话模型委派）"，未授权标 ⚠），供 `flow_stages.mermaid` |
 | `diagnose(problems)` | 诊断码 → 人话（含"改哪里"） |
 

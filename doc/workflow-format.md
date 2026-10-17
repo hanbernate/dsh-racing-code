@@ -235,6 +235,7 @@ contract-tests ──► race ──┤                                    ├�
 | 分支 | `racing/<lane-id>` |
 | 建立 | 编排者在**开赛前**执行 `git worktree add .worktrees/<lane-id> -b racing/<lane-id>` |
 | 子代理怎么进去 | `subagent` 工具**没有 cwd 参数**，子代理继承父会话的 cwd（= 项目根）。所以 lane 的提示词里必须写死绝对路径：所有 bash 用 `cd <worktree> && …`，文件工具用绝对路径 |
+| 子代理显示名 | `subagent` 的 `description` 用 §5.3 的 `<lane 词干>-<model>`；`flow_stages` 的「子代理显示名」行给出可直接照抄的名字 |
 | 修订轮 | **复用同一个 worktree、同一个分支、同一个子代理（同一个模型）**，不新建赛道 |
 | 每轮收口 | lane 在本轮修订后**提交到自己的分支**，方便 CR 只看"本轮改了什么" |
 | 结束 | 比赛期间 worktree **保留**（CR 要读、用户可能要挑取）；`commit` 完成后清理落败 lane 的 worktree（**分支保留**） |
@@ -259,6 +260,23 @@ contract-tests ──► race ──┤                                    ├�
 | 只重跑谁 | 再进入赛段时**只重跑被 CR 点名要修的 lane**；没被点名的 lane 必须验证"确实没变"（HEAD 与工作区都干净），CR 下一轮直接沿用上一轮对它的结论 |
 | 提交 | 每轮修订后 lane 提交到自己的分支，commit message 带轮次（如 `round 2: 修正边界处理`） |
 | 独立性 | **lane 之间永不互相看**：CR 的反馈**按赛道切分**，每条 lane 只收到自己的问题清单（不含另一条 lane 的问题与评分对比）；横向比较只出现在给用户看的 CR 报告里 |
+
+### 5.3 赛道子代理的显示名
+
+赛道子代理在 `list_agents` / GUI 里的名字就是 `subagent` 的 `description`，规范固定为：
+
+| 组成 | 规则 |
+|---|---|
+| 形态 | `<lane 词干>-<model>`：紧凑 slug，**不含 provider**、不含空格与其它分隔符 |
+| 词干 | lane id 去掉尾部 `-<单个字母>` 序号段（`implement-a` → `implement`，`foo-bar-b` → `foo-bar`）；没有这个后缀就用原 id（`frontend` → `frontend`）；去掉后会变空（如 id 就是 `a`）则用原 id |
+| model | 该 lane 的**生效路由**的 model（图内标注 > front-matter > 当前会话模型）；路由未声明（`session`/缺键）时后缀用 `session` |
+
+例：`implement-a` + `opencode-go/deepseek-v4.1-flash` → `implement-deepseek-v4.1-flash`；`implement-b` + `opencode-go/glm-5.3-flash` → `implement-glm-5.3-flash`；未声明路由的 `frontend` → `frontend-session`。
+
+- **名字由插件算好**：`flow_stages.details` 的「子代理显示名」行给出 `lane-id=名字`（`laneAgentName()` / `laneAgentNameLine()`，`lib/flow.js`），编排者照抄，不要自己拼；
+- **复盘轮沿用**：同一个 lane 跨轮复用同一个子代理，退化重建（原会话不可续）时也用同一个名字，`send_message` 才不会发错赛道；
+- **两条 lane 的显示名不得相同**：两条 lane 配同一个 model 时 `-<model>` 会撞名（§10 自查）；
+- 只改**委派时的显示名**：lane id、分支 `racing/<lane-id>`、worktree 目录都不含模型——lane 名由 §5 定义（= 首个阶段 id），`provider/model` 里的 `/` 也做不了目录名。
 
 ## 6. 声明流程时的常见意图对照
 
@@ -326,7 +344,7 @@ commit: kilo/kilo-auto/free
 
 - 顺序阶段按**声明**分流：模型表里写了 `provider/model` 的阶段 → 一次前台 `subagent`；`session`/未声明的 → **在当前会话直接执行**（不委派）；**lane 永远委派**（lane 选 `session` = 子代理继承会话模型）。**没有按阶段命名的例外**——`commit` 委派，是因为配置里给它声明了模型。
 - **代码不得硬编码具体的阶段名或模型名**：阶段与模型只有一个来源——项目声明与用户选择；生成器/渲染层不得按阶段名分支，也不得在文案里点名某个模型。
-- **进入并行组**：同一条 assistant 消息里把所有 lane **同时发起**（后台运行），不要一条一条等；
+- **进入并行组**：同一条 assistant 消息里把所有 lane **同时发起**（后台运行），不要一条一条等；每个赛道子代理的 `description` 用 §5.3 的显示名（照抄 `flow_stages` 的「子代理显示名」行）；
 - **汇合点**必须**等所有 lane 结束**（成功或失败）才开始；
 - 分支：判定 = **带建议的用户关口**——执行方先给**建议与依据**（跑测试、看 diff），再用
   `ask_user_question` 让**用户**按条件边选一条，并把"判定 = 什么 → 下一阶段 = 谁"写进给用户的汇报里；
@@ -447,6 +465,7 @@ CR 的结论**不是**"选一个赢家"就结束，而是一个闭环：
 - [ ] 每个阶段 id 都是 `小写字母开头 + 小写字母/数字/连字符`；
 - [ ] 要并行的阶段写成了**并行组节点**，且它们都能走到**同一个**汇合点（通常是 CR）；
 - [ ] 每条 lane 的名字（= 它的第一个阶段 id）在模型表里有路由，且**互不相同**；
+- [ ] 每条 lane 的**子代理显示名**（`<词干>-<model>`，§5.3）在两条 lane 之间**不同**——配同一个 model 会撞名；
 - [ ] CR 的模型与任何 lane 都不同（避免自评偏好）；
 - [ ] 评审回边指向**并行组**（而不是某一条 lane），并且带条件；
 - [ ] `maxReviewRounds` 设成了你愿意等的轮数（默认 2）；
@@ -463,7 +482,7 @@ CR 的结论**不是**"选一个赢家"就结束，而是一个闭环：
 
 把模板里的 `<worktree>` 换成 **`flow_stages` 给出的该赛道 worktree 绝对路径**（它的位置由 front-matter 的
 `laneDir` 决定：默认 `<项目根>/.worktrees/<lane-id>`，`laneDir: branch` 时是 `<项目根>/racing/<lane-id>`），
-`<worktree>` 与分支名一一对应。
+`<worktree>` 与分支名一一对应；调 `subagent` 时 `description` 用 §5.3 的显示名（`flow_stages` 的「子代理显示名」行可直接照抄）。
 
 **首轮（开赛）**：
 

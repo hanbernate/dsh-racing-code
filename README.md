@@ -68,7 +68,7 @@ missing and where to add it — but **the GUI no longer merges it for you** (see
 | Metaphor | What it maps to |
 |---|---|
 | Lane | each out-edge of a **parallel group node** `{{…}}`: one git worktree, one model, one independent take |
-| Green flag | the orchestrator launches **every lane in one message**, never one after another |
+| Green flag | the orchestrator launches **every lane in one message**, never one after another; each subagent is named `<stem>-<model>` (e.g. `implement-deepseek-v4.1-flash`), so the model behind each lane is visible at a glance |
 | Physical isolation | one `git worktree` + branch per lane (`racing/<lane-id>`) so lanes cannot overwrite each other. The directory defaults to `<project root>/.worktrees/<lane-id>`; with `laneDir: branch` in the flow file it **equals the branch name** (e.g. `racing/implement-a`), matching a container layout where every branch has its own directory |
 | Judge (CR) | all lanes converge on a **review stage** that scores each take against the same standard |
 | Review round | the CR sends **each lane its own problems** back to **that lane's own model** (`send_message` to the same child), which revises in the same worktree/branch and commits; the CR re-reviews, and **only when every lane is clean does that round declare a winner** (at most `maxReviewRounds`, default 2 — past that it asks you) |
@@ -252,8 +252,9 @@ longer writes it for you.
 3. The orchestrator runs the diagram: a sequential stage splits **by declaration** — with a declared model it
    is one foreground `subagent` call with an explicit `provider`/`model` and a self-contained prompt, without
    one it runs directly in the current session; **lanes always delegate**; `commit` delegates because the
-   configuration declares a model for it. Entering a **parallel group** launches every lane in one message and
-   waits for all of them before the join.
+   configuration declares a model for it. Entering a **parallel group** launches every lane in one message, each
+   subagent named after its model (`<stem>-<model>`, from the `flow_stages` name line), and waits for all of them
+   before the join.
 4. Each lane works inside its own worktree and commits to its own branch; the CR reads every worktree, scores
    each take, triages **single-lane problems** vs **common problems**, and traces each common problem to the
    constraint it suggests is missing.
