@@ -1,0 +1,18 @@
+# dsh-racing-code — profile patch layer.
+#
+# One host row. It reads <session cwd>/doc/racing-code.md (Config.projectFlowPath)
+# and, only when that file declares a parseable mermaid flow, registers a
+# system-prompt section plus the read-only `flow_stages` tool on that agent.
+#
+# There is no global flow and no built-in fallback: a project without the file is
+# simply not enabled — no section, no tool, no diagnostics. The guards below are
+# defaults; a project's flow file may override all three in its front matter.
+- insert:
+    - id: racing-code
+      name: 'dsh-racing-code'
+      config:
+        enabled: true
+        projectFlowPath: doc/racing-code.md
+        maxStageRepeats: 3
+        maxLanes: 4
+        maxReviewRounds: 2

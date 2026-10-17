@@ -1,0 +1,44 @@
+{
+  "name": "dsh-racing-code",
+  "version": "0.1.0",
+  "description": "Per-project development flows for DSH: a project's doc/racing-code.md declares stages, parallel lanes and per-stage models as a mermaid diagram; the host half injects it and lets the main session race several models, review them, and feed the review back until they pass.",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "workflow",
+    "mermaid",
+    "subagent"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./flow": "./lib/flow.js",
+    "./sources": "./lib/sources.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "lib",
+    "locale",
+    "doc",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh.md"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "prepublishOnly": "npm test"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

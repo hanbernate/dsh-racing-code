@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Racing code",
+    "description": "Per-project development flows, declared in the project's own doc/racing-code.md as a mermaid diagram: stages run in order, parallel lanes race several models in separate git worktrees, and a CR review feeds each lane its own problems until every lane passes. Projects without that file are not enabled."
+  }
+}

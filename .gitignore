@@ -1,0 +1,13 @@
+# lane worktrees for racing-code runs
+.worktrees/
+
+# local scratch: temporary scripts/analysis (see the temporary-scripts skill)
+.script/
+
+# dependencies and packaging leftovers
+node_modules/
+*.tgz
+npm-debug.log*
+
+# OS noise
+.DS_Store
