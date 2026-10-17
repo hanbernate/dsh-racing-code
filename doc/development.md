@@ -35,6 +35,28 @@
 | 委派工具行的 `modelSelectionSettings: true` | ✅ 官方 `standard` / `ptc` preset 自带，无需改 |
 | 四条示例路由的真实调用 | ✅ 已用 workflow 探针各跑通一次；`mimo-v2.6-flash` 流式被上游挡住，故示例里用 `glm-5.3-flash` |
 
+### 仓库布局（2026-10-17 起）：worktree 容器
+
+项目目录 `/home/liumenghan/dsh-racing-code` **不再是仓库工作区**，而是容器：
+
+```text
+dsh-racing-code/
+├── .bare/    裸仓库（对象 / refs / origin）
+├── .git      文件：gitdir: ./.bare
+└── main/     分支 main 的 worktree（代码、测试、文档都在这里）
+```
+
+实现与验证时注意三条：
+
+1. **工作区命令都在 `main/` 里跑**：`git -C /home/liumenghan/dsh-racing-code/main status`、
+   `cd /home/liumenghan/dsh-racing-code/main && npm test`；容器根只做整仓操作
+   （`git worktree list` / `fetch` / `branch`）。容器根跑 `git status` 会报 `must be run in a work tree`，这是预期。
+2. **插件从 `main/` 安装**：`install_bundle /home/liumenghan/dsh-racing-code/main`（`package.json` 在 worktree 里）。
+   换 worktree 改代码后要重新安装指向新目录，并**重启 dsh** 加载新的 JS 模块代
+   （本次得到 `application: restart-required`，重启后生效）。
+3. **流程文件指路**：会话 cwd 是容器根，所以 profile 补丁里该行配
+   `projectFlowPath: main/doc/racing-code.md`（被跟踪的那一份）。
+
 ## 2. 里程碑总览
 
 | # | 里程碑 | 产物 | 依赖 | 规模 | 状态 |

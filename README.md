@@ -21,7 +21,7 @@ file, the plugin is **not enabled at all** for that project.
 plugin_manager  install_bundle  /home/liumenghan/dsh-racing-code
 
 # 2) give the project a flow; this repository's own file is a good starting point
-mkdir -p doc && cp /home/liumenghan/dsh-racing-code/doc/racing-code.md doc/racing-code.md
+mkdir -p doc && cp /home/liumenghan/dsh-racing-code/main/doc/racing-code.md doc/racing-code.md
 
 # 3) ask what is in force (read-only, re-read from disk):
 #    the orchestrator calls flow_stages, and the system prompt carries the same flow
@@ -252,17 +252,43 @@ catalog: `mimo-v2.6-pro` ✅, `glm-5.3-flash` ✅, `deepseek-v4.1-flash` ✅, `k
 
 ## 10. Layout
 
+**This repository is laid out as a worktree container**: the project directory is not a repository working
+tree but a container holding the bare repository plus one directory per branch.
+
 ```text
-dsh-racing-code/
-├── package.json      cordis.patch.yml      locale/{zh,en}.json
-├── lib/index.js      # host half: ~standard Config, per-agent section + tool, cache/refresh/teardown
-├── lib/flow.js       # pure layer: mermaid/YAML subset, graph rules, lanes, loops, routes, rendering
-├── lib/sources.js    # source layer: read, enablement (disabled/missing/unreadable/invalid/ok), watch
-├── test/             # node --test: flow / sources / host / package (68 cases)
-└── doc/{racing-code.md, workflow-format.md, architecture.md, compatibility.md, development.md}
+/home/liumenghan/dsh-racing-code/       ← project directory = container (git works, but there is no work tree)
+├── .bare/                              bare repository: objects / refs / origin
+├── .git                                a file containing: gitdir: ./.bare
+└── main/                               the worktree for branch main — the tree below lives inside it
+    ├── package.json      cordis.patch.yml      locale/{zh,en}.json
+    ├── lib/index.js      # host half: ~standard Config, per-agent section + tool, cache/refresh/teardown
+    ├── lib/flow.js       # pure layer: mermaid/YAML subset, graph rules, lanes, loops, routes, rendering
+    ├── lib/sources.js    # source layer: read, enablement (disabled/missing/unreadable/invalid/ok), watch
+    ├── test/             # node --test: flow / sources / host / package (68 cases)
+    └── doc/{racing-code.md, workflow-format.md, architecture.md, compatibility.md, development.md}
 ```
 
 There is no client half: no `dsh.client`, no bundle, no settings page (§7).
+
+Two consequences of that layout:
+
+1. **Working-tree commands run inside `main/`** (`git -C main status`, `npm test` with absolute paths under
+   `main/`). The container root is for repository-wide operations only (`git worktree list`, `git fetch`,
+   `git branch`); it has no work tree, so `git status` there reports `must be run in a work tree` — expected.
+2. **The flow file is the tracked `main/doc/racing-code.md`**, while a session's cwd is the container root, so the
+   plugin needs to be pointed at it:
+
+   ```yaml
+   # ~/.dsh/profiles/web/cordis.patch.yml
+   - id: racing-code
+     config:
+       projectFlowPath: main/doc/racing-code.md
+   ```
+
+   The bundle itself is **installed from `main/`** (`install_bundle /home/liumenghan/dsh-racing-code/main`)
+   because `package.json` lives in the worktree — an unavoidable consequence of developing a plugin inside its own
+   repository: point a new install at whichever worktree holds the code, and restart dsh to load the new module
+   generation.
 
 ## 11. Docs
 

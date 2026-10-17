@@ -22,7 +22,7 @@
 plugin_manager  install_bundle  /home/liumenghan/dsh-racing-code
 
 # 2) 在要用流程的项目里放一份流程图；本仓库自己那份可以直接抄
-mkdir -p doc && cp /home/liumenghan/dsh-racing-code/doc/racing-code.md doc/racing-code.md
+mkdir -p doc && cp /home/liumenghan/dsh-racing-code/main/doc/racing-code.md doc/racing-code.md
 
 # 3) 会话里问一下现在生效的是什么（只读、现读现算）
 #    编排者会调 flow_stages，或直接读系统提示里的流程段落
@@ -234,25 +234,48 @@ mkdir -p doc && cp <本仓库>/doc/racing-code.md doc/racing-code.md    # 或者
 
 ## 10. 目录
 
+**本仓库自己的布局是"worktree 容器"**：项目目录不是仓库工作区，而是装着裸仓库与各分支 worktree 的容器。
+
 ```text
-dsh-racing-code/
-├── package.json          # dsh.bundle.patch（**没有** dsh.client：本插件没有浏览器半）
-├── cordis.patch.yml      # 插入宿主行 racing-code（含 §6 的默认值）
-├── lib/
-│   ├── index.js          # 宿主半：Config（~standard）、按 agent 注册段落与工具、缓存/热刷新/teardown
-│   ├── flow.js           # 纯函数：YAML/mermaid 子集解析、图校验、lane/join、回边、路由合并、渲染、诊断
-│   └── sources.js        # 取源：读项目流程图、启用判定（disabled/missing/unreadable/invalid/ok）、fs.watch
-├── locale/               # 插件卡片标题/描述（zh + en）
-├── doc/
-│   ├── racing-code.md    # 本仓库自己的流程（唯一来源的活样例）
-│   ├── workflow-format.md # 流程文件格式规范（唯一权威）
-│   ├── architecture.md   # 维护者视角：为什么长这样、扩展点依据、数据流
-│   ├── compatibility.md  # 依赖的官方契约清单与失效症状
-│   └── development.md    # 开发计划：里程碑、接口契约、验收、实测证据、风险
-├── test/                 # node --test：flow / sources / host / package 四组，68 个用例
-├── README.md             # 英文
-└── README.zh.md          # 本文
+/home/liumenghan/dsh-racing-code/       ← 项目目录 = 容器（git 命令能用，但没有工作区）
+├── .bare/                              裸仓库：对象 / refs / origin
+├── .git                                文件，内容 gitdir: ./.bare
+└── main/                               分支 main 的 worktree（下面这份树就在它里面）
+    ├── package.json                    # dsh.bundle.patch（**没有** dsh.client：本插件没有浏览器半）
+    ├── cordis.patch.yml                # 插入宿主行 racing-code（含 §6 的默认值）
+    ├── lib/
+    │   ├── index.js                    # 宿主半：Config（~standard）、按 agent 注册段落与工具、缓存/热刷新/teardown
+    │   ├── flow.js                     # 纯函数：YAML/mermaid 子集解析、图校验、lane/join、回边、路由合并、渲染、诊断
+    │   └── sources.js                  # 取源：读项目流程图、启用判定（disabled/missing/unreadable/invalid/ok）、fs.watch
+    ├── locale/                         # 插件卡片标题/描述（zh + en）
+    ├── doc/
+    │   ├── racing-code.md              # 本仓库自己的流程（唯一来源的活样例）
+    │   ├── workflow-format.md          # 流程文件格式规范（唯一权威）
+    │   ├── architecture.md             # 维护者视角：为什么长这样、扩展点依据、数据流
+    │   ├── compatibility.md            # 依赖的官方契约清单与失效症状
+    │   └── development.md              # 开发计划：里程碑、接口契约、验收、实测证据、风险
+    ├── test/                           # node --test：flow / sources / host / package 四组，68 个用例
+    ├── README.md                       # 英文
+    └── README.zh.md                    # 本文
 ```
+
+两条由这个布局带来的约定：
+
+1. **工作区命令在 `main/` 里跑**（`git -C main status`、`npm test` 要用 `main/` 的绝对路径）；
+   容器根只做"整仓"操作：`git worktree list` / `git fetch` / `git branch`。容器根不是工作区，
+   所以 `git status` 在那里会报 `must be run in a work tree`——这是预期的。
+2. **流程文件在被跟踪的 `main/doc/racing-code.md`**，而会话的 cwd 是容器根，所以插件配置里要指路：
+
+   ```yaml
+   # ~/.dsh/profiles/web/cordis.patch.yml
+   - id: racing-code
+     config:
+       projectFlowPath: main/doc/racing-code.md
+   ```
+
+   插件包本身也**从 `main/` 安装**（`install_bundle /home/liumenghan/dsh-racing-code/main`），
+   因为 `package.json` 在 worktree 里；这属于"插件在自己的仓库里被开发"的必然结果——
+   换 worktree 改插件代码后要重新安装指向新目录，并**重启 dsh** 加载新一代模块。
 
 ## 11. 文档索引
 
