@@ -22,6 +22,7 @@ test('the shipped patch inserts one row with the documented defaults and no glob
   assert.match(patch, /name: 'dsh-racing-code'/)
   for (const line of [
     'enabled: true',
+    'bootstrapEnabled: true',
     'projectFlowPath: doc/racing-code.md',
     'maxStageRepeats: 3',
     'maxLanes: 4',
@@ -35,13 +36,14 @@ test('the shipped patch inserts one row with the documented defaults and no glob
 test('lib/*.js is hand-written: no official implementation imports, no Node APIs in the pure layer', () => {
   const files = readdirSync(new URL('../lib', import.meta.url)).filter(name => name.endsWith('.js'))
   assert.ok(files.includes('flow.js'))
+  assert.ok(files.includes('bootstrap.js'))
   for (const name of files) {
     const source = read(`lib/${name}`)
     assert.ok(!/from\s+['"]@deepseek-ai\//.test(source), `lib/${name} must not import official packages`)
     assert.ok(!/require\(/.test(source), `lib/${name} must stay ESM`)
-    if (name === 'flow.js') {
-      assert.ok(!/from\s+['"]node:/.test(source), 'lib/flow.js must stay pure (no Node APIs)')
-      assert.ok(!/\bprocess\./.test(source), 'lib/flow.js must not touch process')
+    if (name === 'flow.js' || name === 'bootstrap.js') {
+      assert.ok(!/from\s+['"]node:/.test(source), `lib/${name} must stay pure (no Node APIs)`)
+      assert.ok(!/\bprocess\./.test(source), `lib/${name} must not touch process`)
     }
   }
 })
@@ -52,5 +54,6 @@ test('display metadata is shipped for both locales', () => {
     assert.ok(meta.meta?.title, `${locale} needs meta.title`)
     assert.ok(meta.meta?.description, `${locale} needs meta.description`)
   }
+  assert.equal(manifest.exports['./bootstrap'], './lib/bootstrap.js', 'the pure bootstrap layer must be exported')
   assert.ok(manifest.exports['./locale/*.json'], 'locale files must be exported for the plugin inventory')
 })

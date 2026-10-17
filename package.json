@@ -20,6 +20,7 @@
     ".": "./lib/index.js",
     "./flow": "./lib/flow.js",
     "./sources": "./lib/sources.js",
+    "./bootstrap": "./lib/bootstrap.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json",
     "./locale/*.json": "./locale/*.json"

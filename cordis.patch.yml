@@ -12,6 +12,7 @@
       name: 'dsh-racing-code'
       config:
         enabled: true
+        bootstrapEnabled: true
         projectFlowPath: doc/racing-code.md
         maxStageRepeats: 3
         maxLanes: 4

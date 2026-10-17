@@ -448,6 +448,47 @@ test('mergeRoutes: an unresolved flow does not cascade unknown-stage warnings', 
   assert.deepEqual(merged.problems, [])
 })
 
+// ─────────────────────────────── the session sentinel ───────────────────────────────
+
+test('session_sentinel_needs_no_route_missing_warn', () => {
+  const parsed = parseMermaid(doc(null, ['flowchart TD', '  a["A"] --> b["B"]']))
+  const resolved = buildFlow(parsed, {})
+  const merged = mergeRoutes(resolved.stages, { a: 'session' }, null)
+  const codesFor = id => merged.problems.filter(problem => problem.node === id).map(problem => problem.code)
+  assert.deepEqual(codesFor('a'), [], 'an explicit "session" is a decision, not a missing route')
+  assert.deepEqual(codesFor('b'), ['FLOW_ROUTE_MISSING'], 'a route that is simply absent still warns')
+})
+
+test('session_sentinel_marks_route_source', () => {
+  const flow = doc(['racing-code: 1', 'models:', '  a: session'], ['flowchart TD', '  a["A"] --> b["B"]'])
+  const resolved = resolveFlow(flow, { allowedModels: [{ provider: 'kilo', model: 'kilo-auto/free' }] })
+  const a = byId(resolved, 'a')
+  assert.equal(a.route, null, 'the sentinel is not a route')
+  assert.equal(a.routeSource, 'session')
+  assert.equal(a.fallback, true)
+  assert.equal(a.authorized, true, 'delegating on the session model needs no allowlist entry')
+  assert.ok(!resolved.problems.some(problem => problem.code === 'FLOW_ROUTE_MISSING' && problem.node === 'a'))
+  assert.ok(resolved.problems.some(problem => problem.code === 'FLOW_ROUTE_MISSING' && problem.node === 'b'))
+})
+
+test('session_sentinel_renders_session_model', () => {
+  const flow = doc(['racing-code: 1', 'models:', '  a: session'], ['flowchart TD', '  a["A"] --> b["B"]'])
+  const resolved = resolveFlow(flow, {})
+  const section = renderPolicySection({ ...resolved, file: '/tmp/doc/racing-code.md' })
+  assert.match(section, /a=（用当前会话模型）/)
+  assert.match(renderMermaid(resolved), /（用当前会话模型）/)
+})
+
+test('malformed_route_still_warns', () => {
+  const flow = doc(['racing-code: 1', 'models:', "  a: 'not a route'"], ['flowchart TD', '  a["A"] --> b["B"]'])
+  const resolved = resolveFlow(flow, {})
+  assert.ok(resolved.problems.some(problem => problem.code === 'FLOW_ROUTE_MALFORMED' && problem.node === 'a'))
+  const a = byId(resolved, 'a')
+  assert.equal(a.routeSource, null)
+  assert.equal(a.fallback, true)
+  assert.ok(resolved.problems.some(problem => problem.code === 'FLOW_ROUTE_MISSING' && problem.node === 'a'))
+})
+
 test('checkAuthorized: allowlist membership, and no allowlist means no false alarms', () => {
   const stages = [
     { id: 'a', route: { provider: 'kilo', model: 'kilo-auto/free' }, authorized: true },
@@ -551,7 +592,7 @@ test('the repository flow file resolves cleanly, with lanes and a review loop', 
   assert.deepEqual(resolved.joins, [{ at: 'cr', lanes: ['implement-a', 'implement-b'] }])
   assert.deepEqual(
     resolved.loops.map(l => `${l.kind} ${l.via}->${l.backTo} ${l.maxRounds ?? l.maxRepeats}`).sort(),
-    ['review verdict->race 2', 'stage final->design 3', 'stage gate->design 3'])
+    ['review confirm->race 2', 'stage confirm->design 3', 'stage final->design 3', 'stage gate->design 3'])
   assert.equal(byId(resolved, 'implement-a').lane.worktree, 'racing/implement-a')
   assert.equal(byId(resolved, 'implement-a').route.model, 'deepseek-v4.1-flash')
   assert.equal(byId(resolved, 'implement-a').authorized, true)
