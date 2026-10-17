@@ -6,9 +6,9 @@ maxReviewRounds: 2
 laneDir: branch                # 车道目录 = 分支名 → /home/liumenghan/dsh-racing-code/racing/<lane-id>
 models:
   design: opencode-go/mimo-v2.6-pro
-  contract-tests: opencode-go/glm-5.3-flash
+  contract-tests: opencode-go/deepseek-v4.1-flash
   implement-a: opencode-go/deepseek-v4.1-flash
-  implement-b: kilo/kilo-auto/free
+  implement-b: opencode-go/glm-5.3-flash
   cr: opencode-go/mimo-v2.6-pro
   commit: kilo/kilo-auto/free
 ---
@@ -19,8 +19,8 @@ models:
 每个阶段用哪个模型见 front-matter（也可用 `flow_stages` 工具查）。
 
 写代码之前先用文档把设计说清楚（**设计不写代码**），设计被用户明确确认后才进入实现；
-实现阶段**两个模型各开一条赛道**（各自一个 git worktree），CR 逐轮把各自的问题发回对应赛道，
-**改到每条赛道都通过才定胜负、提交**。
+实现阶段**两个模型各开一条赛道**（各自一个 git worktree），CR 逐轮把各自的问题发回对应赛道
+（**发回之前先由用户确认**：图上 `confirm` 关口），**改到每条赛道都通过才定胜负、提交**。
 
 **纯文档改动不走赛道**：定稿后由 `要改代码吗?` 判定——只改文档（README / `doc/*.md`）就直接收口提交，
 不写契约测试、不开赛道（那两样对文档没有可比性）。
@@ -43,7 +43,10 @@ flowchart TD
   common -- "无" --> verdict{"每条赛道都通过?"}
   gate -- "完善约束" --> design
   gate -- "接受现状" --> verdict
-  verdict -- "否：按反馈修订" --> race
+  verdict -- "否：按反馈修订" --> confirm(["用户确认：把 CR 意见发回赛道?"])
+  confirm -- "发回修订" --> race
+  confirm -- "先完善约束" --> design
+  confirm -- "接受现状" --> commit
   verdict -- "是" --> commit
 ```
 
@@ -96,11 +99,14 @@ flowchart TD
    （`doc/workflow-format.md`、`doc/architecture.md`、`AGENTS.md`、或补一条测试）；
 5. 有共同问题 → 用 `ask_user_question` 原样反馈，请用户在图上 `gate` 的两个选项里选；
    选"接受现状"记入已接受清单，后续轮次不再当阻塞问题；
-6. **单赛道问题** → 按赛道切分，`send_message` 发回该赛道原来的子代理，让它在原 worktree、
+6. **把任何意见发回赛道之前，必须走图上 `confirm` 用户关口**（`ask_user_question`，选项就是它的
+   三条出边）："发回修订"才继续第 7 步；"先完善约束" → 回 `design`；"接受现状" → 直接进 `commit`。
+   **不得未经用户确认就 `send_message` 发回赛道**；
+7. **单赛道问题** → 用户确认后按赛道切分，`send_message` 发回该赛道原来的子代理，让它在原 worktree、
    原分支上修订并提交（不要告诉它另一条赛道的问题，也不要给评分对比）；
-7. **只有两条赛道都没有阻塞问题时，才给胜者**（评分依据写清）+ 落选赛道值得挑取的地方；
-8. 还有一条不通过就回到 `race` 开下一轮；超过 `maxReviewRounds` 仍不通过 → 停下问用户；
-9. 只有一条赛道成功时，明确写"共同问题**无法判定**"。
+8. **只有两条赛道都没有阻塞问题时，才给胜者**（评分依据写清）+ 落选赛道值得挑取的地方；
+9. 还有一条不通过就回到 `race` 开下一轮；超过 `maxReviewRounds` 仍不通过 → 停下问用户；
+10. 只有一条赛道成功时，明确写"共同问题**无法判定**"。
 
 ### commit
 
