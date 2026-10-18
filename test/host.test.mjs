@@ -779,10 +779,14 @@ test('host_llm_adapters_updated_re_resolves_the_routes', async () => {
   const { agent, harness } = await flowHarness({ files: { [FILE]: RUNTIME_FLOW }, services: dsh.services })
   assert.match(agent.registered.sections[0].text(), /deepseek-v4\.1-flash/)
 
-  dsh.setDirectory({ 'opencode-go': ['glm-5.3-flash', 'mimo-v2.6-pro'], kilo: [] })
+  // The refresh must be observable, so the new directory reorders the pool — and every entry
+  // stays inside the allowlist (the pool is directory ∩ allowlist, plan §5): glm-5.3-flash is
+  // advertised but not authorized, so it can never be assigned.
+  dsh.setDirectory({ 'opencode-go': ['mimo-v2.6-pro'], kilo: ['kilo-auto/free'] })
   await harness.emit('llm/adapters-updated')
   await tick()
   await tick()
-  assert.match(agent.registered.sections[0].text(), /lane-a=opencode-go·glm-5\.3-flash（运行时解析）/)
+  assert.match(agent.registered.sections[0].text(), /lane-a=opencode-go·mimo-v2\.6-pro（运行时解析）/)
+  assert.match(agent.registered.sections[0].text(), /lane-b=kilo·kilo-auto\/free（运行时解析）/)
 })
 
