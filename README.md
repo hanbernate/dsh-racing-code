@@ -69,7 +69,7 @@ missing and where to add it — but **the GUI no longer merges it for you** (see
 |---|---|
 | Lane | each out-edge of a **parallel group node** `{{…}}`: one git worktree, one model, one independent take |
 | Green flag | the orchestrator launches **every lane in one message**, never one after another; each lane stage names its subagent `<node stem>-<model>` (e.g. `implement-deepseek-v4.1-flash`), so the model behind each lane is visible at a glance |
-| Physical isolation | one `git worktree` + branch per lane (`racing/<lane-id>`) so lanes cannot overwrite each other. The directory defaults to `<project root>/.worktrees/<lane-id>`; with `laneDir: branch` in the flow file it **equals the branch name** (e.g. `racing/implement-a`), matching a container layout where every branch has its own directory |
+| Physical isolation | one `git worktree` + branch per lane (`<workBranch>-racing/<lane-id>`, or `racing/<lane-id>` without a work branch) so lanes cannot overwrite each other. The directory defaults to `<project root>/.worktrees/<lane-id>`; with `laneDir: branch` in the flow file it **equals the branch name** (e.g. `0.0.x-racing/implement-a`), matching a container layout where every branch has its own directory |
 | Judge (CR) | all lanes converge on a **review stage** that scores each take against the same standard |
 | Review round | the CR sends **each lane its own problems** back to **that lane's own model** (`send_message` to the same child), which revises in the same worktree/branch and commits; the CR re-reviews, and **only when every lane is clean does that round declare a winner** (at most `maxReviewRounds`, default 2 — past that it asks you) |
 | The signal that matters | a **common problem** (≥2 lanes failing the same way) ≈ an ambiguous or missing constraint. Letting each lane work around it would disguise a spec gap as a style difference, so it **never goes to the lanes** — it stops and asks you |
@@ -85,7 +85,7 @@ missing and where to add it — but **the GUI no longer merges it for you** (see
 | The file exists and the diagram parses | **Enabled**: inject the flow section and register `flow_stages` |
 | The file exists but the diagram is broken | **No flow injected** — only **one diagnostic line**; `flow_stages` returns the full diagnostics, and `racing_code_init` is registered too (preview only by default; `force` replaces the broken file) |
 
-- The path defaults to `docs/racing-code.md` and is configurable via `projectFlowPath`;
+- The path defaults to `docs/racing-code.md`; a project points at its own flow file with `.dsh/racing-code.yml` (`projectFlowPath` is a deprecated fallback);
 - **models live in the same file**: the second line of a stage's node label
   (`"Implement A<br/>opencode-go · deepseek-v4.1-flash"`) or the front matter's `models:` — equivalent, label wins.
   So "how this project works" is **one file, one commit, one review**;
@@ -153,8 +153,8 @@ A node's **shape** decides its kind ([full grammar and semantics](docs/workflow-
 - everything else in the file is free prose for humans — it never enters the prompt, so the markdown doubles as
   the project's flow documentation;
 - **lane isolation is a hard constraint**: the directory comes from the front matter's `laneDir` (default
-  `<project root>/.worktrees/<lane-id>`; `laneDir: branch` gives `<project root>/racing/<lane-id>`, i.e. directory
-  equals branch name), with branch `racing/<lane-id>`,
+  `<project root>/.worktrees/<lane-id>`; `laneDir: branch` gives `<project root>/<workBranch>-racing/<lane-id>`, i.e.
+  directory equals branch name), with branch `<workBranch>-racing/<lane-id>` (`racing/<lane-id>` without a work branch),
   **reused across rounds** (same worktree, same branch, same model — a round is not a new lane). The `subagent`
   tool has no cwd parameter, so a lane's prompt must spell out the worktree's absolute path (template in the
   spec, §11).
@@ -210,7 +210,7 @@ declares a model for it.
 **The `session` sentinel**: writing `plan: session` in the models table means the user **has picked** "declare
 no model" (`routeSource: 'session'`) — an undeclared non-lane stage runs directly in the current session, an
 undeclared lane delegates on the session model — and it does **not** report `FLOW_ROUTE_MISSING`; only a
-**missing key** does. Write safety: the target is pinned to `projectFlowPath`, writes outside the root are
+**missing key** does. Write safety: the target is pinned to the project's flow path, writes outside the root are
 refused, unverifiable text never lands (zero-error self-check), preview is the default, and overwriting always
 takes an explicit `force`. Details: [docs/bootstrap.md](docs/bootstrap.md).
 
@@ -223,10 +223,15 @@ fields are edited in the profile patch's `racing-code` row `config` (defaults sh
 |---|---|---|---|
 | `enabled` | boolean | `true` | master switch (turn everything off temporarily) |
 | `bootstrapEnabled` | boolean | `true` | master switch for the new-project bootstrap: `false` keeps even the "no file" case **fully silent** (no `racing_code_init`) |
-| `projectFlowPath` | string | `docs/racing-code.md` | the only source, relative to the project root |
+| `projectFlowPath` | string | `docs/racing-code.md` | deprecated fallback for the flow path; prefer the per-project `.dsh/racing-code.yml` (`flowPath`) |
+| `workBranch` | string | (none) | optional global fallback for the lane-name prefix (`""` disables it); project config and flow front matter win |
 | `maxStageRepeats` | number | `3` | default back-edge guard (overridable in front matter) |
 | `maxLanes` | number | `4` | max lanes per parallel group (overridable in front matter) |
 | `maxReviewRounds` | number | `2` | max "CR feedback → lane revision" rounds (overridable in front matter) |
+
+Per-project overrides live in `<session cwd>/.dsh/racing-code.yml` (optional; unknown keys ignored):
+`flowPath`, `workBranch`, `enabled`, `bootstrapEnabled` and the three guards. Precedence: flow front matter >
+project config > the global fields above (a global `enabled: false` stays a hard master switch).
 
 ## 7. Why there is no settings page
 
@@ -318,18 +323,18 @@ Two consequences of that layout:
 1. **Working-tree commands run inside `main/`** (`git -C main status`, `npm test` with absolute paths under
    `main/`). The container root is for repository-wide operations only (`git worktree list`, `git fetch`,
    `git branch`); it has no work tree, so `git status` there reports `must be run in a work tree` — expected.
-2. **The flow file is the tracked `main/docs/racing-code.md`**, while a session's cwd is the container root, so the
-   plugin needs to be pointed at it:
+2. **The flow file is the tracked `0.0.x/docs/racing-code.md`**, while a session's cwd is the container root, so
+   the project points at it from its own config (no global profile path needed):
 
    ```yaml
-   # ~/.dsh/profiles/web/cordis.patch.yml
-   - id: racing-code
-     config:
-       projectFlowPath: main/docs/racing-code.md
+   # /home/liumenghan/dsh-racing-code/.dsh/racing-code.yml
+   racing-code: 1
+   flowPath: 0.0.x/docs/racing-code.md
+   workBranch: 0.0.x
    ```
 
    Lane directories follow the same rule: this repository's flow sets `laneDir: branch`, so the two lanes land in
-   `racing/implement-a/` and `racing/implement-b/`, siblings of `main/` — **the directory name is the branch name**.
+   `0.0.x-racing/implement-a/` and `0.0.x-racing/implement-b/`, siblings of `0.0.x/` — **the directory name is the branch name**.
    A normal repository (session cwd = the working tree) keeps the default `.worktrees/` and ignores it in git.
 
    The bundle itself is **installed from `main/`** (`install_bundle /home/liumenghan/dsh-racing-code/main`)

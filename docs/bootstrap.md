@@ -20,8 +20,8 @@
 ## 1. 现状与缺口（HEAD `0009269`）
 
 - 插件三层：[lib/index.js](../lib/index.js)（宿主半，347 行）、[lib/flow.js](../lib/flow.js)（纯函数，1132 行）、[lib/sources.js](../lib/sources.js)（取源，200 行）；测试 4 个文件。
-- [docs/racing-code.md](racing-code.md) 已用 `laneDir: branch`（赛道目录 = 分支名 = `racing/<lane-id>`，见 [workflow-format.md](workflow-format.md) §5.1）。
-- profile：bundle 从 `/home/liumenghan/dsh-racing-code/main` 链接安装；racing-code 行 `projectFlowPath: main/docs/racing-code.md`。
+- [docs/racing-code.md](racing-code.md) 已用 `laneDir: branch` + `workBranch: 0.0.x`（赛道目录 = 分支名 = `0.0.x-racing/<lane-id>`，见 [workflow-format.md](workflow-format.md) §5.1）。
+- profile：bundle 从 `/home/liumenghan/dsh-racing-code/main` 链接安装；racing-code 行只留全局默认；项目用 `/home/liumenghan/dsh-racing-code/.dsh/racing-code.yml` 指路。
 
 | 缺口 | 位置/证据 |
 |---|---|
@@ -198,7 +198,7 @@ flowchart TD
 
 | gitLayout | 生成的 `laneDir` | 计划项 |
 |---|---|---|
-| `worktree-container`（本项目这种） | `branch`（赛道目录 = `racing/<lane-id>`） | 无需 ignore；给"开赛前建 worktree"的命令 |
+| `worktree-container`（本项目这种） | `branch`（赛道目录 = `<workBranch>-racing/<lane-id>`） | 无需 ignore；给"开赛前建 worktree"的命令 |
 | `git-repo` | 省略（默认 `.worktrees`） | 检查 `.gitignore` 是否含 `.worktrees/`，缺则 warn + fix 命令 |
 | `none` | 省略 | blocked：先 `git init`，否则并行赛道开不起来 |
 
@@ -206,7 +206,7 @@ flowchart TD
 
 ## 5. 写入安全与诊断码
 
-1. 目标钉死 `flowFilePath(cwd, Config.projectFlowPath)`（复用 [lib/sources.js](../lib/sources.js)），工具不收路径参数；解析结果必须在 `cwd` 内 → `BOOTSTRAP_TARGET_OUTSIDE_ROOT`；
+1. 目标钉死 `flowFilePath(cwd, 项目配置 flowPath ?? Config.projectFlowPath)`（复用 [lib/sources.js](../lib/sources.js)），工具不收路径参数；解析结果必须在 `cwd` 内 → `BOOTSTRAP_TARGET_OUTSIDE_ROOT`；
 2. 写前自校验 `resolveFlow(文本)` 必须 0 error → `BOOTSTRAP_TEMPLATE_INVALID`（绝不落半成品）；
 3. `write:true` 时父目录必须存在 → `BOOTSTRAP_PARENT_MISSING`（fix：`mkdir -p doc`，不代建目录）；
 4. 默认 `createIfAbsent`；已存在 → `BOOTSTRAP_FILE_EXISTS`（提示 `force`）；`force` 走 `replaceIfVersion`，冲突 → `BOOTSTRAP_WRITE_CONFLICT`；
@@ -216,7 +216,7 @@ flowchart TD
 8. 所选 lane 与显式 `cr` 路由相同 → `BOOTSTRAP_CR_REUSE_RISK`（warn；插件拿不到会话模型名，涉及 `cr: session` 的精确比较留给编排者）；
 9. 写入成功 → `BOOTSTRAP_RESTART_REQUIRED`（info，"新开会话后生效"）。
 
-**钉死（本轮约束）**：`write:true` 时 `plan` 有 `blocked` 项（如 `gitLayout: 'none'`）一律**拒写**（fix 随 `plan` 返回），诊断码 `BOOTSTRAP_PLAN_BLOCKED`（点名 blocked 项，具体原因见 plan 各项，如 `BOOTSTRAP_PARENT_MISSING`）；`force` 的 `replaceIfVersion` 版本取 `stat.version`；`generatedOn` 必须是 `YYYY-MM-DD`，否则 `BOOTSTRAP_TEMPLATE_INVALID`（含 `-->` 注入防护）；`.git` 文件**无** `gitdir:` → `unknown`（不是 `git-repo`）；相对 `gitdir` 以 `.git` 所在目录为基准解析、路径允许含空格。lane 的 worktree **绝对路径**由编排者在 lane 提示词里写死（[workflow-format.md](workflow-format.md) §11 模板），工具输出与生成文本只给相对目录（`racing/<lane-id>` / `<laneDir>/<lane-id>`）。`BOOTSTRAP_CR_REUSE_RISK` 保持"无条件提示"（cr 默认走会话模型、lane 与会话撞模型有自评偏好），**精确比较移交编排者**（插件拿不到会话模型名）。
+**钉死（本轮约束）**：`write:true` 时 `plan` 有 `blocked` 项（如 `gitLayout: 'none'`）一律**拒写**（fix 随 `plan` 返回），诊断码 `BOOTSTRAP_PLAN_BLOCKED`（点名 blocked 项，具体原因见 plan 各项，如 `BOOTSTRAP_PARENT_MISSING`）；`force` 的 `replaceIfVersion` 版本取 `stat.version`；`generatedOn` 必须是 `YYYY-MM-DD`，否则 `BOOTSTRAP_TEMPLATE_INVALID`（含 `-->` 注入防护）；`.git` 文件**无** `gitdir:` → `unknown`（不是 `git-repo`）；相对 `gitdir` 以 `.git` 所在目录为基准解析、路径允许含空格。lane 的 worktree **绝对路径**由编排者在 lane 提示词里写死（[workflow-format.md](workflow-format.md) §11 模板），工具输出与生成文本只给相对目录（`<workBranch>-racing/<lane-id>` / `<laneDir>/<lane-id>`）。`BOOTSTRAP_CR_REUSE_RISK` 保持"无条件提示"（cr 默认走会话模型、lane 与会话撞模型有自评偏好），**精确比较移交编排者**（插件拿不到会话模型名）。
 
 ---
 
@@ -272,7 +272,7 @@ flowchart TD
 ```bash
 cd /home/liumenghan/dsh-racing-code/main && npm test          # 全绿（基线 69 + 新增 ~29）
 node --test test/bootstrap.test.mjs                           # 纯函数层
-git -C /home/liumenghan/dsh-racing-code worktree list         # 赛道 worktree 都在 racing/<lane-id>
+git -C /home/liumenghan/dsh-racing-code worktree list         # 赛道 worktree 都在 <workBranch>-racing/<lane-id>
 ```
 
 - 新项目（临时目录，无 `docs/`）：新会话 → 系统提示**无** racing-code 痕迹；说"给这个项目启动 racing-code" → 工具只预览；

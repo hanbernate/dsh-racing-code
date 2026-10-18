@@ -71,7 +71,7 @@ DSH 已经给了全部所需接缝，所以**不需要改 DSH 源码**：
 
 ```
         ┌─ 项目流程（唯一来源）─────────────────────────────────────┐
-        │ <cwd>/docs/racing-code.md      （Config.projectFlowPath）   │  谁写：这个项目自己
+        │ <cwd>/docs/racing-code.md      （项目的 .dsh/racing-code.yml；全局兜底）   │  谁写：这个项目自己
         │   ├─ mermaid 图                阶段·顺序·并行·分支·回退·复核 │
         │   └─ 图内路由标注 / front-matter models:      每阶段用哪个模型 │
         └───────────────────────────────────────────────────────────┘
@@ -153,7 +153,8 @@ DSH 已经给了全部所需接缝，所以**不需要改 DSH 源码**：
 ```js
 {
   enabled: true,                          // 总开关（多项目环境里想临时全关时用）
-  projectFlowPath: 'docs/racing-code.md',  // 唯一来源，相对项目根
+  projectFlowPath: 'docs/racing-code.md',  // 弃用兜底；项目用 .dsh/racing-code.yml 指路
+  workBranch: null,                        // 可选：赛道名前缀的全局兜底（"" 关闭）
   maxStageRepeats: 3,                     // 回边护栏默认值（可被 front-matter 覆盖）
   maxLanes: 4,                            // 一个并行赛段最多几条 lane（可被 front-matter 覆盖）
   maxReviewRounds: 2,                     // 最多几轮"CR 反馈 → 赛道修订"（可被 front-matter 覆盖）
@@ -188,9 +189,9 @@ DSH 已经给了全部所需接缝，所以**不需要改 DSH 源码**：
 "多个模型分别实现"必须**物理隔离**，否则 lane 之间会互相覆盖同一批文件，比较也失去意义：
 
 ```
-<项目根>/.worktrees/implement-a/   ← 默认：目录由 laneDir 决定，分支 racing/implement-a
-<项目根>/racing/implement-a/       ← laneDir: branch：目录 = 分支名（容器布局用这个）
-<项目根>/racing/implement-b/       ← lane B 的 worktree，分支 racing/implement-b
+<项目根>/.worktrees/implement-a/           ← 默认：目录由 laneDir 决定，分支 <workBranch>-racing/implement-a
+<项目根>/<workBranch>-racing/implement-a/   ← laneDir: branch：目录 = 分支名（容器布局用这个）
+<项目根>/<workBranch>-racing/implement-b/   ← lane B 的 worktree，分支 <workBranch>-racing/implement-b
 ```
 
 四个不能让步的点：
@@ -279,7 +280,7 @@ cr → {存在共同问题?} --有--> (用户决定：完善约束还是接受�
 规则：顺序阶段按声明分流——声明了 provider/model 的阶段前台 subagent 委派一次（显式传 provider/model）；
       没声明（session/缺键）的在当前会话直接执行（不委派）；lane 永远委派（lane 选 session = 子代理继承
       当前会话模型）。没有按阶段命名的例外。委派时子代理看不到本会话，提示词必须自包含；
-      [race: …] 是并行组：同一条消息里同时发起，每个赛道阶段节点的子代理 description 用「<节点词干>-<model>」显示名（逐节点），各自在自己的 worktree（路径见 flow_stages；分支 racing/<lane-id>）
+      [race: …] 是并行组：同一条消息里同时发起，每个赛道阶段节点的子代理 description 用「<节点词干>-<model>」显示名（逐节点），各自在自己的 worktree（路径见 flow_stages；分支 <workBranch>-racing/<lane-id>）
       里工作，提示词写死绝对路径；汇合点要等所有赛道结束后才开始；落败赛道的 worktree 不得擅自删除；
       cr 的问题按赛道切分，用 send_message 发回该赛道原来的子代理，在原 worktree/原分支上改并提交，
       最多 2 轮"反馈 → 修订"，改到每条赛道都通过才定胜负；共同问题走用户关口，不得让赛道各自绕过；
@@ -316,7 +317,7 @@ cr → {存在共同问题?} --有--> (用户决定：完善约束还是接受�
   ],
   "stages": [                                // 只列阶段；顺序 = 执行顺序
     { "id": "implement-a", "label": "实现 A",
-      "lane": { "id": "implement-a", "worktree": "racing/implement-a", "branch": "racing/implement-a",
+      "lane": { "id": "implement-a", "worktree": "0.0.x-racing/implement-a", "branch": "0.0.x-racing/implement-a",
                 "fanOutFrom": "race", "joinAt": "cr" },
       "route": { "provider": "opencode-go", "model": "deepseek-v4.1-flash", "authorized": true,
                  "source": "label" },        // label | front-matter | session（显式哨兵）；缺键为 null
@@ -365,7 +366,7 @@ cr → {存在共同问题?} --有--> (用户决定：完善约束还是接受�
 
 ## 10. 边界与不变量
 
-- 插件只读工作区里的**一个**约定路径（`Config.projectFlowPath`）：不删、不执行命令、不起子进程。**唯一的写**：用户两次确认（确认流程 → 逐节点选模型）后，由 `racing_code_init` 写 `Config.projectFlowPath` 这**一个**文件（`createIfAbsent`；`force` → `replaceIfVersion`），其余一切零写入；缺文件时**零段落**、只有该工具（`bootstrapEnabled` 可关）。 另外，**代码里不得出现具体的阶段名或模型名**用于分支或文案：阶段与模型只有一个来源——项目流程文件的**声明**与**用户的选择**（模板默认图的阶段 id 只是那张图的定义，不是判断依据）。
+- 插件只读工作区里的**一个**约定路径（`Config.projectFlowPath`）：不删、不执行命令、不起子进程。**唯一的写**：用户两次确认（确认流程 → 逐节点选模型）后，由 `racing_code_init` 写项目的流程文件（目标来自 `.dsh/racing-code.yml` 的 `flowPath`，或 `Config.projectFlowPath` 兜底）这**一个**文件（`createIfAbsent`；`force` → `replaceIfVersion`），其余一切零写入；缺文件时**零段落**、只有该工具（`bootstrapEnabled` 可关）。 另外，**代码里不得出现具体的阶段名或模型名**用于分支或文案：阶段与模型只有一个来源——项目流程文件的**声明**与**用户的选择**（模板默认图的阶段 id 只是那张图的定义，不是判断依据）。
 - 插件**不建 worktree、不合分支、不删分支**：`git worktree add/remove`、`git merge` 全部由编排者用 bash
   在阶段里做；插件只把"lane 必须隔离、worktree 放哪、结束后不许擅自删"讲清楚。
 - 插件**不代跑判定、不拦截委派、不掌握轮数**：分支、赛道、复盘轮与护栏靠提示段落 + 工具输出讲清楚，
@@ -388,7 +389,7 @@ cr → {存在共同问题?} --有--> (用户决定：完善约束还是接受�
 | 缺路由时 | 用**当前会话模型**兜底 + 明确提示 | 报错：新增阶段就卡住；猜模型：静默跑错模型 |
 | 分支 | **v1 就支持**条件边与回边 | 只支持单链：TDD 的"红了回实现"是主线场景 |
 | 并行怎么表达 | **显式的并行组节点** `{{…}}`，每个出边一条 lane | 让阶段的多条无条件出边表示并行：**回边没法指回"这一组赛道"**，"再来一轮"只能重新画一批节点 |
-| lane 的目录 | 由流程文件的 `laneDir` 决定（默认 `.worktrees`；`branch` = 目录即分支名） | 写死 `.worktrees/`：在"项目目录是 worktree 容器、每个分支一个目录"的布局里（`main/` 与 `racing/<lane-id>/` 同级）显得格格不入；写死"目录 = 分支名"：普通仓库里会和项目自己的目录撞名，且要 ignore `racing/`。可配一次，两种布局都自然 |
+| lane 的目录 | 由流程文件的 `laneDir` 决定（默认 `.worktrees`；`branch` = 目录即分支名） | 写死 `.worktrees/`：在"项目目录是 worktree 容器、每个分支一个目录"的布局里（`0.0.x/` 与 `0.0.x-racing/<lane-id>/` 同级）显得格格不入；写死"目录 = 分支名"：普通仓库里会和项目自己的目录撞名，且要 ignore `racing/`。可配一次，两种布局都自然 |
 | 新项目引导 | 缺文件时**沉默**，只有用户明确指令才由 `racing_code_init` 引导；**两次用户介入**（确认流程 → 逐节点选模型）；非赛道节点默认 `session`（显式哨兵） | 自动挑模型会把「用户的选择」变成脚本的猜测；两次介入把结构与模型分开确认，代价是多一轮对话 |
 | lane 的隔离方式 | **git worktree（必须在项目根之下）** | 同一个工作区串行：多个模型互相覆盖，没有可比性；建在 `../`：沙箱直接拒绝 |
 | 修订轮由谁改 | **发回该赛道原来的模型/原子代理** | CR 直接动手改：评审与实现同一只手；换一个新子代理改：丢掉"它为什么这么写"的上下文 |

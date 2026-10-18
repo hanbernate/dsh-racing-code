@@ -16,9 +16,12 @@
 ## 1. 唯一来源：项目里的这份文件
 
 **没有全局流程，也没有内置兜底。** 一个项目的流程只来自
-`<项目根>/<Config.projectFlowPath>`（默认 `docs/racing-code.md`），项目根 = `agent.session.header.cwd`
-（会话创建时的绝对工作目录）。而**模型表也在这份文件里**——所以"这个项目怎么干活"是**一个文件、一次提交、
-一份 review** 的事，不需要在别处再维护一张表。
+该项目自己的 `.dsh/racing-code.yml` 指的 `flowPath`（缺省 `docs/racing-code.md`；全局 `Config.projectFlowPath`
+只是弃用兜底），项目根 = `agent.session.header.cwd`（会话创建时的绝对工作目录）。而**模型表也在这份文件里**——
+所以"这个项目怎么干活"是**一个文件、一次提交、一份 review** 的事，不需要在别处再维护一张表。
+
+项目内可选 `<项目根>/.dsh/racing-code.yml` 覆盖 `flowPath` / `workBranch` / `enabled` / `bootstrapEnabled`
+与三个护栏（优先级：流程 front-matter > 项目配置 > 全局 Config；全局 `enabled: false` 是硬总开关）。
 
 ### 1.1 启用条件：声明了才启用
 
@@ -62,6 +65,7 @@ maxStageRepeats: 3             # 可选：同一阶段在一轮任务里最多�
 maxLanes: 4                    # 可选：一个并行赛段最多几条 lane，默认 4
 maxReviewRounds: 2             # 可选：评审后最多几轮"反馈 → 赛道修订"，默认 2
 laneDir: branch                # 可选：赛道 worktree 放哪；默认 .worktrees，写 branch 表示"目录 = 分支名"
+workBranch: 0.0.x              # 可选：赛道名前缀（分支与目录 = <workBranch>-racing/<lane-id>）；省略则用 racing/<lane-id>
 models:                        # 可选：模型表（与图内标注等价，图内优先，见 §7）
   cr: opencode-go/mimo-v2.6-pro
 ---
@@ -230,10 +234,10 @@ contract-tests ──► race ──┤                                    ├�
 
 | 项 | 约定 |
 |---|---|
-| 位置 | 默认 `<项目根>/.worktrees/<lane-id>/`；front-matter 写 `laneDir: branch` 时是 `<项目根>/racing/<lane-id>/`
+| 位置 | 默认 `<项目根>/.worktrees/<lane-id>/`；front-matter 写 `laneDir: branch` 时是 `<项目根>/<workBranch>-racing/<lane-id>/`
 （目录 = 分支名）；写别的值（如 `laneDir: wt`）就用它当父目录。**一律必须在项目根之下**（见下） |
-| 分支 | `racing/<lane-id>` |
-| 建立 | 编排者在**开赛前**执行 `git worktree add .worktrees/<lane-id> -b racing/<lane-id>` |
+| 分支 | `<workBranch>-racing/<lane-id>`；没写 `workBranch` 时退回 `racing/<lane-id>` |
+| 建立 | 编排者在**开赛前**执行 `git worktree add <dir> -b <branch>`（`flow_stages` 的 `lane` 字段给出该 lane 的 `worktree` 与 `branch`） |
 | 子代理怎么进去 | `subagent` 工具**没有 cwd 参数**，子代理继承父会话的 cwd（= 项目根）。所以 lane 的提示词里必须写死绝对路径：所有 bash 用 `cd <worktree> && …`，文件工具用绝对路径 |
 | 子代理显示名 | `subagent` 的 `description` 用 §5.3 的 `<节点词干>-<model>`（逐节点）；`flow_stages` 的「子代理显示名」行给出可直接照抄的名字 |
 | 修订轮 | **复用同一个 worktree、同一个分支、同一个子代理（同一个模型）**，不新建赛道 |
@@ -471,6 +475,7 @@ CR 的结论**不是**"选一个赢家"就结束，而是一个闭环：
 - [ ] `maxReviewRounds` 设成了你愿意等的轮数（默认 2）；
 - [ ] `laneDir` 与你的布局一致：普通仓库用默认 `.worktrees`（记得加进 `.gitignore`）；
   "项目目录本身是 worktree 容器、每个分支一个目录"的布局用 `laneDir: branch`，此时不需要 ignore 任何东西；
+- [ ] 赛道名前缀：多分支/容器项目写 `workBranch`（分支与目录 = `<workBranch>-racing/<lane-id>`）；不写则退回 `racing/<lane-id>`；
 - [ ] 每条 lane 的提示词里都写了"你的 worktree 绝对路径"（模板见 §11）；
 - [ ] 有一条明确的"完成"路径（终点阶段），跑完它就算这轮任务结束；
 - [ ] 分支/用户关口的条件文字都写得能被回答（"测试全绿?" 而不是 "好不好?"）；
@@ -481,19 +486,20 @@ CR 的结论**不是**"选一个赢家"就结束，而是一个闭环：
 ## 11. lane 提示词模板（给编排者用）
 
 把模板里的 `<worktree>` 换成 **`flow_stages` 给出的该赛道 worktree 绝对路径**（它的位置由 front-matter 的
-`laneDir` 决定：默认 `<项目根>/.worktrees/<lane-id>`，`laneDir: branch` 时是 `<项目根>/racing/<lane-id>`），
-`<worktree>` 与分支名一一对应；调 `subagent` 时 `description` 用 §5.3 的显示名（`flow_stages` 的「子代理显示名」行可直接照抄）。
+`laneDir` 与 `workBranch` 决定：默认 `<项目根>/.worktrees/<lane-id>`，`laneDir: branch` 时是
+`<项目根>/<workBranch>-racing/<lane-id>`），`<worktree>` 与分支名一一对应；调 `subagent` 时 `description`
+用 §5.3 的显示名（`flow_stages` 的「子代理显示名」行可直接照抄）。
 
 **首轮（开赛）**：
 
 ```
-你在 git worktree <worktree> 里工作（分支 racing/implement-a）。
+你在 git worktree <worktree> 里工作（分支 <workBranch>-racing/implement-a）。
 主工作区 /abs/path 不要改；所有命令用 `cd <worktree> && …`，
 文件工具请用该目录下的绝对路径。
 任务：<阶段说明>。
 约束：契约与测试在 <路径>；**不得修改测试断言**；验收命令 `<命令>`。
 产出：diff 摘要 + 验收命令输出 + 你认为没做好的地方。
-做完请把改动提交到 racing/implement-a（message 前缀 `round 1:`）。
+做完请把改动提交到 <workBranch>-racing/implement-a（message 前缀 `round 1:`）。
 ```
 
 **修订轮（把 CR 的反馈发回同一个子代理）**：

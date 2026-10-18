@@ -14,7 +14,7 @@ v0.1.0（M0–M5）与 v0.2.0（M6–M8）均已实现；M9–M11 是 v0.2.0 之
 | | |
 |---|---|
 | **要做** | 读项目里的 `docs/racing-code.md` → 解析 mermaid 图与模型表 → 给该项目 root agent 注入系统提示段落 + 注册 `flow_stages` 工具；项目没声明就**什么都不做** |
-| **不做** | 不做 GUI、不做全局/内置流程、不委派、不建 worktree、不跑判定、不数轮次、不写工作区（v0.2 起唯一例外：用户两次确认后由 `racing_code_init` 写 `projectFlowPath` 这一个文件） |
+| **不做** | 不做 GUI、不做全局/内置流程、不委派、不建 worktree、不跑判定、不数轮次、不写工作区（v0.2 起唯一例外：用户两次确认后由 `racing_code_init` 写流程文件；目标来自 `.dsh/racing-code.yml` 的 `flowPath`） |
 | **可以晚做** | `run_flow` 确定性执行器（v2）；"打印流程模板"的小工具已落地为 `racing_code_init`（v0.2.0） |
 
 **总原则**（贯穿所有里程碑）：
@@ -55,7 +55,7 @@ dsh-racing-code/
    换 worktree 改代码后要重新安装指向新目录，并**重启 dsh** 加载新的 JS 模块代
    （本次得到 `application: restart-required`，重启后生效）。
 3. **流程文件指路**：会话 cwd 是容器根，所以 profile 补丁里该行配
-   `projectFlowPath: main/docs/racing-code.md`（被跟踪的那一份）。
+   项目配置 `/home/liumenghan/dsh-racing-code/.dsh/racing-code.yml` 指到 `0.0.x/docs/racing-code.md`。
 
 ## 2. 里程碑总览
 
@@ -100,7 +100,8 @@ cordis.patch.yml      - insert:
                             name: 'dsh-racing-code'
                             config:
                               enabled: true
-                              projectFlowPath: docs/racing-code.md
+                              projectFlowPath: docs/racing-code.md   # 弃用兜底
+                              workBranch: 0.0.x
                               maxStageRepeats: 3
                               maxLanes: 4
                               maxReviewRounds: 2
@@ -120,7 +121,7 @@ lib/  test/           空目录，等 M1 起
   **`unsupported`**——这是**预期**：官方把该状态定义为"它的 Config 不是原生 Schemastery 图"
   （`packages/extensions/tool-cordis/src/config.ts:16`），而我们按零依赖约定用 `~standard` schema
   （Loader 接受它、fiber 正常在跑；`unsupported` 只表示 inspect 投影画不出表单）。
-  **所以"schema 里恰好五个字段"这条不能用 inspect 验**，改用行为验：把补丁里的 `projectFlowPath` 指向一个
+  **所以"schema 里恰好五个字段"这条不能用 inspect 验**，改用行为验：把项目配置里的 `flowPath` 指向一个
   不存在的路径 → 会话里 `flow_stages` 立刻改口说"未启用"；改回来 → 立刻恢复（`patchReload: live`），
   见 M4 第 2 步；
 - 装完**不做任何事**：随便开一个没有流程文件的项目，会话里没有段落、没有 `flow_stages`（这条在 M3 复验）。
@@ -234,7 +235,7 @@ lib/  test/           空目录，等 M1 起
 | `Tool.listTools` | ✅ 出现 `flow_stages`（活跃会话的 `agents.list()` 安装路径生效） |
 | **段落真的进了系统提示** | ✅ 会话日志 `system/message` 里含 `项目流程：/home/liumenghan/dsh-racing-code/docs/racing-code.md` + 紧凑图 + 路由 + 规则行；安装**前**那一条没有它 |
 | **文件变更热刷新** | ✅ 同一条日志里最新一条 system prompt 已经是我改图**之后**的版本（含 `needs-code{要改代码吗?}`）——`fs.watch` → 重算 → 下一步生效，全程真实会话 |
-| **`flow_stages` 真实读盘** | ✅ 在会话里直接调用：返回入口 `plan`、6 个阶段、`[race: implement-a ∥ implement-b]`、3 条回边（评审轮最多 2 轮）、各阶段路由、`.worktrees/implement-a`（当时还是默认布局；现在本仓库用 `laneDir: branch`，赛道目录是 `racing/implement-a`）、全部阶段说明与渲染好的带模型 mermaid |
+| **`flow_stages` 真实读盘** | ✅ 在会话里直接调用：返回入口 `plan`、6 个阶段、`[race: implement-a ∥ implement-b]`、3 条回边（评审轮最多 2 轮）、各阶段路由、`.worktrees/implement-a`（当时还是默认布局；现在本仓库用 `laneDir: branch`，赛道目录是 `0.0.x-racing/implement-a`）、全部阶段说明与渲染好的带模型 mermaid |
 | **配置热生效 + "没声明就不启用"活路径** | ✅ 临时把该行 `projectFlowPath` 指向 `docs/racing-code.md.disabled` → 下一步的 `system/message` **不再含流程段落**、`request/header` 里 **`flow_stages` 消失**；还原补丁 → 工具**重新出现在请求头**（全程未重启、未新开会话）。探针已删除，profile 补丁已还原 |
 
 **仍未实测的两条**（诚实记录，等第一次真跑赛道时确认）：

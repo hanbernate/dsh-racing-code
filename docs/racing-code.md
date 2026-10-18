@@ -3,7 +3,8 @@ racing-code: 1
 maxStageRepeats: 3
 maxLanes: 3
 maxReviewRounds: 2
-laneDir: branch                # 车道目录 = 分支名 → /home/liumenghan/dsh-racing-code/racing/<lane-id>
+laneDir: branch                # 车道目录 = 分支名 → /home/liumenghan/dsh-racing-code/0.0.x-racing/<lane-id>
+                               # （赛道名前缀 = 工作分支，由项目配置 .dsh/racing-code.yml 的 workBranch: 0.0.x 提供）
 models:
   plan: session                 # 显式"用当前会话模型"→ 在当前会话直接执行
   contract-tests: session
@@ -78,7 +79,7 @@ flowchart TD
 （TDD 的三步顺序与用例质量要求就落在本节，本项目不依赖全局技能）：
 
 - 在 `lib/*.js` 里写下导出签名与 JSDoc 契约（可以是抛 `not implemented` 的骨架）；
-- 赛道在 `/home/liumenghan/dsh-racing-code/racing/<lane-id>`（分支名即目录名，见 front-matter 的 `laneDir: branch`）；
+- 赛道在 `/home/liumenghan/dsh-racing-code/0.0.x-racing/<lane-id>`（分支名即目录名；前缀见项目配置 `.dsh/racing-code.yml` 的 `workBranch: 0.0.x`）；
 - 在 `test/*.test.mjs` 里按契约写用例（`node --test`），**三类都要有**：
   - **正常路径**：契约承诺的主行为；
   - **边界**：空集合、零/负值、阈值相等、刚好越界一档；
@@ -92,8 +93,8 @@ flowchart TD
 
 两条**并行**赛道，同一份契约、不同模型，互不干扰：
 
-- 只有你的 worktree 是你的：`/home/liumenghan/dsh-racing-code/racing/implement-a`
-  （或 `racing/implement-b`），分支 `racing/implement-a`；主工作区（`main/`）别动；
+- 只有你的 worktree 是你的：`/home/liumenghan/dsh-racing-code/0.0.x-racing/implement-a`
+  （或 `0.0.x-racing/implement-b`），分支 `0.0.x-racing/implement-a`；主工作区（`0.0.x/`）别动；
 - 所有命令用 `cd <worktree> && …`，文件工具用该目录下的绝对路径；
 - 只改 `lib/`，**不得**改 `test/` 里的断言，**不得删除、跳过（skip）或注释掉**用例；
 - 写**最小实现**让测试转绿：不为没写过的测试加代码，不做投机性扩展；

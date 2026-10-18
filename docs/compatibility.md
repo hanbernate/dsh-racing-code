@@ -13,7 +13,7 @@ profile `web`，`patchReload: live`，时间 2026-10-17。
 ### 1.1 插件行与配置（不再依赖设置表单）
 
 - **依赖**：bundle 补丁插入一行 `racing-code`（`patchId` 就是我们自己的命名空间）；该行的 Config 决定
-  `projectFlowPath` 与三个护栏默认值。**本插件不做 GUI**，所以字段**不需要** `.volatile()`。
+  `projectFlowPath`（弃用兜底）、`workBranch` 与三个护栏默认值；项目内 `.dsh/racing-code.yml` 可覆盖。**本插件不做 GUI**，所以字段**不需要** `.volatile()`。
 - **Config 用 `~standard` schema（零依赖）**：`export const Config = { '~standard': { version: 1, vendor, validate } }`，
   `validate` 返回 `{ value: <已填默认值的配置> }` 或 `{ issues: [{ message, path }] }`；官方先例见
   `packages/boot/app-boot/tests/config-reload.spec.ts:236`（手写 `.mjs` 插件）。校验失败时 fibre 保留上一次配置。
@@ -107,7 +107,7 @@ profile `web`，`patchReload: live`，时间 2026-10-17。
   （`packages/subagent/tool-subagent/src/index.ts:389-427`，实测 `Tool.listTools` 一致）。
   子代理继承委派者会话的 cwd（`subagent-acp` 的 README/源码明确写了这条继承规则；in-process 驱动同源）。
 - **推论**：让"两个模型各写一版"落地，只能**物理隔离 + 提示词里写死绝对路径**：
-  编排者 `git worktree add .worktrees/<lane-id> -b racing/<lane-id>`，然后在 lane 的提示词里声明
+  编排者 `git worktree add .worktrees/<lane-id> -b <workBranch>-racing/<lane-id>`，然后在 lane 的提示词里声明
   "你的 worktree 是 `<绝对路径>`，所有 bash 用 `cd <worktree> && …`，文件工具用该目录下的绝对路径"。
 - **为什么 worktree 必须在项目根之下**：`fs-sandbox` 的 `workspace-write` 只允许写
   **会话工作区（= 会话 cwd = 项目根）与平台临时根**（`packages/fs/fs-sandbox/README.md`：
@@ -267,11 +267,11 @@ return { ok: text !== null, reply: text === null ? null : String(text).trim().sl
 
 | 结论 | 证据 |
 |---|---|
-| 手写 `~standard` Config 被 Loader 接受、`apply` 拿到配置 | `Config.listConfigs` 报 `status: unsupported`（预期值，见 §1.1）而**不是** `inactive`；改 `projectFlowPath` 后行为随之改变 |
+| 手写 `~standard` Config 被 Loader 接受、`apply` 拿到配置 | `Config.listConfigs` 报 `status: unsupported`（预期值，见 §1.1）而**不是** `inactive`；改项目配置 `flowPath` 后行为随之改变 |
 | 按 agent 注册的**段落真的进了系统提示** | 本会话 `session.v4.jsonl.zstd` 的 `system/message` 记录里含 `项目流程：<绝对路径>` + 紧凑图 + 路由 + 规则行；**安装前**那条记录没有它 |
 | 按 agent 注册的**工具真的进了请求头** | 同一日志的 `request/header` 记录里出现 `flow_stages`（并能被模型直接调用，返回真实读盘结果） |
 | 改项目流程图 → **下一步生效** | 改图后最新一条 `system/message` 已是新版图（含新加的 `needs-code{要改代码吗?}`） |
-| 改 profile 配置 → **热生效**（不用重启、不用新会话） | 把 `projectFlowPath` 指向不存在的路径后：最新 `system/message` **不再含流程段落**、`request/header` 里 **`flow_stages` 消失**；还原后两者都回来 |
+| 改 profile 配置 → **热生效**（不用重启、不用新会话） | 把项目配置 `flowPath` 指向不存在的路径后：最新 `system/message` **不再含流程段落**、`request/header` 里 **`flow_stages` 消失**；还原后两者都回来 |
 | 活跃会话的**补装路径** | 插件是在会话进行中安装的，靠 `ctx.agents.list()` 立刻对本会话生效 |
 
 **仍未实测（诚实记录）**：

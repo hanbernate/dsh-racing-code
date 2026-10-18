@@ -63,7 +63,7 @@ mkdir -p docs && cp /home/liumenghan/dsh-racing-code/main/docs/racing-code.md do
 |---|---|
 | 赛道（lane） | 图上**并行组节点** `{{…}}` 的每条出边：各自在自己的 git worktree 里、用不同模型独立完成同一件事 |
 | 发车 | 编排者在**同一条消息**里把所有 lane 同时发起，不是一条条排队；每个阶段节点的子代理显示名是 `<节点词干>-<model>`（如 `implement-deepseek-v4.1-flash`），一眼看出谁在跑哪个模型 |
-| 物理隔离 | 每条 lane 一个 `git worktree` + 独立分支（`racing/<lane-id>`），互不覆盖。目录默认 `<项目根>/.worktrees/<lane-id>`；流程文件写 `laneDir: branch` 时**目录 = 分支名**（如 `racing/implement-a`），与"每个分支一个目录"的容器布局一致 |
+| 物理隔离 | 每条 lane 一个 `git worktree` + 独立分支（`<workBranch>-racing/<lane-id>`；没有工作分支时是 `racing/<lane-id>`），互不覆盖。目录默认 `<项目根>/.worktrees/<lane-id>`；流程文件写 `laneDir: branch` 时**目录 = 分支名**（如 `0.0.x-racing/implement-a`），与"每个分支一个目录"的容器布局一致 |
 | 裁判（CR） | 所有赛道汇聚到**评审阶段**，在同一标准下逐条打分、列问题 |
 | 复盘轮 | CR 把**每条赛道自己的问题**发回**那条赛道原来的模型**（`send_message` 给同一个子代理），在原 worktree、原分支上改，提交后复评；**改到每条赛道都没问题，那一轮才给出胜者**；轮次上限 `maxReviewRounds`（默认 2），超限停下问你 |
 | 最有价值的信号 | **共同问题**：≥2 条赛道都犯的同一类问题 ≈ 约束有歧义/有缺口。让它们各自绕过只会把规格问题伪装成风格差异，所以**不走赛道修订**，而是停下问你 |
@@ -79,7 +79,7 @@ mkdir -p docs && cp /home/liumenghan/dsh-racing-code/main/docs/racing-code.md do
 | 文件存在、图能解析 | **启用**：注入流程段落 + 注册 `flow_stages` |
 | 文件存在、图写坏了 | **不注入流程**，只注入**一句诊断**（哪个诊断码、改哪里）；`flow_stages` 可查完整诊断，另有 `racing_code_init`（默认只预览，`force` 才覆盖坏文件） |
 
-- 文件名默认 `docs/racing-code.md`，可用插件配置 `projectFlowPath` 改；
+- 文件名默认 `docs/racing-code.md`；项目用自己的 `.dsh/racing-code.yml` 指路（`projectFlowPath` 只是弃用兜底）；
 - **模型也在这份文件里**：节点标签第二行（`"实现 A<br/>opencode-go · deepseek-v4.1-flash"`）
   或 front-matter 的 `models:`——两处等价、图内优先。所以"这个项目怎么干活"是**一个文件、一次提交、一份 review**；
 - **升级插件不会改变任何项目的流程**（流程只随项目文件走）；
@@ -141,7 +141,8 @@ flowchart TD
 - `### <阶段 id>` 小节是该阶段的**委派提示词骨架**，由 `flow_stages` 按需返回；
 - 文件的其余部分是自由正文，写给人看、不进提示词——所以这份 markdown 同时也是项目的流程文档；
 - **lane 的隔离是硬约束**：目录由 front-matter 的 `laneDir` 决定（默认 `<项目根>/.worktrees/<lane-id>`；
-  `laneDir: branch` 时为 `<项目根>/racing/<lane-id>`，即目录 = 分支名）+ 分支 `racing/<lane-id>`，跨轮**复用**
+  `laneDir: branch` 时为 `<项目根>/<workBranch>-racing/<lane-id>`，即目录 = 分支名）+ 分支
+  `<workBranch>-racing/<lane-id>`（没写 `workBranch` 时退回 `racing/<lane-id>`），跨轮**复用**
   （同一个 worktree、同一个分支、同一个模型；"轮次"不是"新赛道"）。子代理没有 cwd 参数，
   所以 lane 的提示词里必须写死 worktree 的绝对路径（模板见规范 §11）。
 
@@ -187,7 +188,7 @@ flowchart TD
 **lane 永远委派**（lane 选 `session` = 子代理继承会话模型）；`commit` 委派是因为配置里声明了模型。
 **`session` 哨兵**：模型表里显式写 `plan: session` = 用户**已选定**"不声明模型"（`routeSource: 'session'`）
 ——非 lane 阶段在当前会话直接执行、lane 委派时用当前会话模型——**不报** `FLOW_ROUTE_MISSING`，只有**缺键**才报。
-写入安全要点：目标钉死 `projectFlowPath`、越根拒绝、坏文本不落盘（自校验 0 error）、默认只预览、
+写入安全要点：目标钉死项目的流程路径、越根拒绝、坏文本不落盘（自校验 0 error）、默认只预览、
 覆盖必须显式 `force`。细节见 [docs/bootstrap.md](docs/bootstrap.md)。
 
 ## 6. 配置项
@@ -199,10 +200,15 @@ flowchart TD
 |---|---|---|---|
 | `enabled` | boolean | `true` | 总开关（想临时全关时用） |
 | `bootstrapEnabled` | boolean | `true` | 新项目引导总开关：false 时连"没文件"也**完全沉默**（不注册 `racing_code_init`） |
-| `projectFlowPath` | string | `docs/racing-code.md` | 唯一来源，相对项目根 |
+| `projectFlowPath` | string | `docs/racing-code.md` | 弃用兜底；优先项目内 `.dsh/racing-code.yml` 的 `flowPath` |
+| `workBranch` | string | （无） | 赛道名前缀的全局兜底（`""` 关闭前缀）；项目配置与流程 front-matter 优先 |
 | `maxStageRepeats` | number | `3` | 回边护栏默认值（可被 front-matter 覆盖） |
 | `maxLanes` | number | `4` | 一个并行赛段最多几条 lane（可被 front-matter 覆盖） |
 | `maxReviewRounds` | number | `2` | 最多几轮"CR 反馈 → 赛道修订"（可被 front-matter 覆盖） |
+
+项目内覆盖写 `<会话 cwd>/.dsh/racing-code.yml`（可选；未知键忽略）：`flowPath`、`workBranch`、
+`enabled`、`bootstrapEnabled` 与三个护栏。优先级：流程 front-matter > 项目配置 > 上表的全局字段
+（全局 `enabled: false` 仍是硬总开关）。
 
 ## 7. 为什么没有设置页
 
@@ -294,17 +300,18 @@ mkdir -p docs && cp <本仓库>/docs/racing-code.md docs/racing-code.md    # 或
 1. **工作区命令在 `main/` 里跑**（`git -C main status`、`npm test` 要用 `main/` 的绝对路径）；
    容器根只做"整仓"操作：`git worktree list` / `git fetch` / `git branch`。容器根不是工作区，
    所以 `git status` 在那里会报 `must be run in a work tree`——这是预期的。
-2. **流程文件在被跟踪的 `main/docs/racing-code.md`**，而会话的 cwd 是容器根，所以插件配置里要指路：
+2. **流程文件在被跟踪的 `0.0.x/docs/racing-code.md`**，而会话的 cwd 是容器根，所以由项目自己的配置指路
+   （不再需要全局 profile 路径）：
 
    ```yaml
-   # ~/.dsh/profiles/web/cordis.patch.yml
-   - id: racing-code
-     config:
-       projectFlowPath: main/docs/racing-code.md
+   # /home/liumenghan/dsh-racing-code/.dsh/racing-code.yml
+   racing-code: 1
+   flowPath: 0.0.x/docs/racing-code.md
+   workBranch: 0.0.x
    ```
 
    车道目录也跟着这个布局走：本仓库的流程图写了 `laneDir: branch`，所以两条赛道分别落在
-   `racing/implement-a/`、`racing/implement-b/`，与 `main/` 同级——**目录名就是分支名**。
+   `0.0.x-racing/implement-a/`、`0.0.x-racing/implement-b/`，与 `0.0.x/` 同级——**目录名就是分支名**。
    普通仓库（会话 cwd 就是工作区）保持默认 `.worktrees/` 即可，记得把它写进 `.gitignore`。
 
    插件包本身也**从 `main/` 安装**（`install_bundle /home/liumenghan/dsh-racing-code/main`），

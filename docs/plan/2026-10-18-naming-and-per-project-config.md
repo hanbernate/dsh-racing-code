@@ -1,6 +1,6 @@
 # dsh-racing-code：命名与「按项目配置」修改计划
 
-> 日期：2026-10-18 ｜ 基线：`0.0.x` ｜ 状态：已定稿，待实施
+> 日期：2026-10-18 ｜ 基线：`0.0.x` ｜ 状态：**已实施**（赛道 + CR 完成，见 §10）
 > 本文是计划文件（plan of record）。草稿与临时产物不进仓库，见同目录 `.gitignore`。
 
 ## 0. 用户已拍板
@@ -116,3 +116,24 @@ maxReviewRounds: 2
 | 探测 `workBranch` 在 bare/detached 下失败 | front-matter / 项目配置覆盖；失败不加前缀 + info |
 | 两条赛道都碰 `flow.js`/`bootstrap.js` 冲突 | 只合并胜者；CR 按赛道切分问题 |
 | 全局侧链接与 HMR 不一致 | M4 统一到同一 worktree 并重装 |
+
+## 10. 实施结果（2026-10-18）
+
+| 项 | 结果 |
+|---|---|
+| 硬切改名 | `e8ed688`（doc→docs、design→plan），`npm test` 115/115 |
+| 计划文档 | `344cdf6` + `dd65743`（enabled 总开关语义） |
+| 红契约 | `24001b4`（新增 `test/workbranch.test.mjs`、`test/project-config.test.mjs`） |
+| 赛道 A | `0.0.x-racing/implement-a` @ `5230d41`（deepseek-v4.1-flash）：契约全绿；未接 `lib/index.js`，bootstrap 工具未用上新能力 |
+| 赛道 B | `0.0.x-racing/implement-b` @ `45ea599`（glm-5.3-flash）：契约全绿 + 接好 `lib/index.js`；**胜者**，cherry-pick 进 `0.0.x` = `50bdc59` |
+| CR | 两条均 131/131；B 多出 bootstrap 工具接线（项目 `flowPath`/`workBranch`/探测），胜出；A 分支保留、worktree 已清理 |
+| 项目配置迁移 | 本仓与 QuantTrade 各写 `.dsh/racing-code.yml`；profile 删除钉死的 `projectFlowPath`；profile `package.json` link 统一到 `0.0.x` |
+| 真实读盘验证 | 本仓 → `docs/racing-code.md`、entry `plan`、lane `0.0.x-racing/implement-a`；QuantTrade → `0.4.x/docs/racing-code.md`、lane `0.4.x-racing/implement-a`；两者 0 problems |
+| 文档回填 | README 中英、workflow-format、racing-code、architecture、bootstrap、compatibility、development |
+
+**遗留（非阻塞）**
+
+1. 项目配置的 `bootstrapEnabled` 只解析、未接到 `install()`：`racing_code_init` 的注册仍看全局开关。需要时再开一轮小赛道。
+2. 探测失败按既有测试（`problems` 必须为空）保持**静默**，未报 `FLOW_WORK_BRANCH_UNKNOWN`；已在契约与测试层面接受。
+3. `workBranch` 校验较松（未按 git ref 规则拒绝 `..`、`~` 等）；`detectWorkBranch` 在"会话 cwd 本身就是某条赛道 worktree"时会二次加前缀。
+4. 启用状态在会话创建时判定：本会话需**新开会话**才会注册 `flow_stages`（当前会话只有 `racing_code_init`）。
