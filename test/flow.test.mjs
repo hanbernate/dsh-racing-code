@@ -648,6 +648,25 @@ test('laneAgentNameLine: a flow without lanes has no name line', () => {
   assert.equal(laneAgentNameLine([]), '')
 })
 
+test('laneAgentNameLine: a chained lane names every node on its own line, stems per node', () => {
+  const graph = [
+    'flowchart TD',
+    '  %% entry: start',
+    '  start["Start"] --> race{{"Race"}}',
+    '  race --> pipe-a["A1<br/>opencode-go · deepseek-v4.1-flash"]',
+    '  pipe-a --> pipe-a2["A2<br/>kilo · kilo-auto/free"]',
+    '  race --> pipe-b["B<br/>opencode-go · glm-5.3-flash"]',
+    '  pipe-a2 --> cr["CR<br/>opencode-go · mimo-v2.6-pro"]',
+    '  pipe-b --> cr',
+    '  cr --> done["Done<br/>kilo · kilo-auto/free"]',
+  ]
+  const line = laneAgentNameLine(resolveFlow(doc(null, graph), {}).stages)
+  assert.equal(
+    line,
+    '子代理显示名：pipe-a=pipe-deepseek-v4.1-flash  pipe-a2=pipe-a2-kilo-auto/free  pipe-b=pipe-glm-5.3-flash')
+  assert.equal(line.split('pipe-a=').length - 1, 1, 'the node id appears once, never once per stage')
+})
+
 test('renderPolicySection: the parallel-group rule pins the lane subagent name to its model', () => {
   const text = renderPolicySection({ ...resolveFlow(REAL, {}), file: '/tmp/doc/racing-code.md' })
   assert.match(text, /子代理显示名/)
