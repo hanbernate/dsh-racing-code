@@ -93,7 +93,9 @@ profile `web`，`patchReload: live`，时间 2026-10-17。
   绝对路径不受限）、`packages/fs/fs-sandbox/README.md`（"Reads, listings, metadata, and read-only watches
   work exactly as with `fs-local`; the mutation fence does not restrict observation"）。
 - **推论**：插件读项目里的流程文件**不需要请求提权**，`read-only` 会话里也能读到；反过来，
-  本插件 v1 **不写任何工作区文件**（写才需要过沙箱）。
+  本插件 v1 **不写任何工作区文件**。v0.2 的 bootstrap 是唯一例外：写盘前按**本会话**解析
+  沙箱策略（`ctx.sandboxPolicy.resolve({ session })`）再落栅栏，所以 `danger-full-access` 会话
+  不会被部署默认的 `workspace-write` 误伤；真正的 `read-only` 会话仍按 bootstrap 的降级处理。
 - **失效症状**：`FS_NOT_FOUND`（文件不在 → 插件不启用，这是正常路径）、`FS_NOT_TEXT`（二进制 → 当解析失败处理）。
 - **兜底**：所有 `FsError` 按 `code` 分支（不要匹配 message 文本），并且**任何读取失败都只降级、不抛**。
   唯一的例外是"文件存在却读不出来"：那时要留一句 `FLOW_FILE_UNREADABLE` 诊断，而不是静默当没声明。

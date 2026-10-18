@@ -379,7 +379,7 @@ plugin_manager        list_bundles / list_plugins
 | R8 | 项目文件是唯一来源，写坏了就没流程 | 用户以为插件坏了 | 解析失败**必须**给诊断（M1 的底线测试 + M3 验收）；`flow_stages` 返回完整诊断 |
 | R9 | mermaid 子集解析是手写的 | 边角输入误判 | 每个 error 码一个反例 + 真实文件夹具；解析规则以 [workflow-format.md](workflow-format.md) 为准，改规范必须同时改测试 |
 | R10 | 模板三处同构漂移（`lib/bootstrap.js` 模板、[racing-code.md](racing-code.md)、README §5 示例） | 生成的流程与文档示例不一致 | 测试按"结构同构 + 0 error"断言、不做全文快照；改一处必须同步另两处 |
-| R11 | 只读沙箱拒写（`FS_SANDBOX_DENIED` 等） | 引导落不了盘 | `BOOTSTRAP_WRITE_FAILED` + 全文返回，两级降级：申请提权 / 手动创建；只预览不受影响 |
+| R11 | 写盘未按会话策略落栅栏（缺 `sandboxPolicy` → 部署默认 `workspace-write`），或会话策略确实拒写 | 引导落不了盘 / `danger-full-access` 被误伤 | 写盘按**本会话**解析策略（`ctx.sandboxPolicy.resolve({ session })`）后落栅栏；仍被拒时 `BOOTSTRAP_WRITE_FAILED` + 全文返回，两级降级：申请提权 / 手动创建；只预览不受影响 |
 | R12 | 生成器 bug 落盘半成品 | 项目拿到解析不了的流程文件 | 写前 `resolveFlow` 0-error 自校验（`BOOTSTRAP_TEMPLATE_INVALID` 拒写）；默认只预览 |
 | R13 | 行为变化被当回归（升级后缺文件会话的工具表多了 `racing_code_init`） | 用户以为插件坏了/越权 | README §3/§5 明写 v0.2 变化 + `bootstrapEnabled: false` 逃生口 |
 

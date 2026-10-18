@@ -210,7 +210,7 @@ flowchart TD
 2. 写前自校验 `resolveFlow(文本)` 必须 0 error → `BOOTSTRAP_TEMPLATE_INVALID`（绝不落半成品）；
 3. `write:true` 时父目录必须存在 → `BOOTSTRAP_PARENT_MISSING`（fix：`mkdir -p doc`，不代建目录）；
 4. 默认 `createIfAbsent`；已存在 → `BOOTSTRAP_FILE_EXISTS`（提示 `force`）；`force` 走 `replaceIfVersion`，冲突 → `BOOTSTRAP_WRITE_CONFLICT`；
-5. `ctx.fs` 被沙箱拒（如 `FS_SANDBOX_DENIED`）→ `BOOTSTRAP_WRITE_FAILED` + 全文返回，两级降级：申请提权 / 手动创建；
+5. 写盘先按**本会话**解析沙箱策略（`ctx.sandboxPolicy.resolve({ session })`，与内置 `write`/`edit` 同源）并作为第 5 参传给 `fs.writeText`；缺省会让沙箱后端退回部署默认 `workspace-write`，`danger-full-access` 会话被误拒。仍被拒（如 `read-only`，或 `workspace-write` 目标在会话工作区外）→ `BOOTSTRAP_WRITE_FAILED` + 全文返回，两级降级：申请提权 / 手动创建；
 6. 赛道缺选择（`write:true`）→ `BOOTSTRAP_CHOICE_REQUIRED`（拒写）；
 7. 候选池为空（白名单禁用/为空）→ `BOOTSTRAP_NO_CANDIDATES`（warn；选项卡只剩"用会话模型"）；
 8. 所选 lane 与显式 `cr` 路由相同 → `BOOTSTRAP_CR_REUSE_RISK`（warn；插件拿不到会话模型名，涉及 `cr: session` 的精确比较留给编排者）；
