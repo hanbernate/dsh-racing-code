@@ -73,7 +73,7 @@ models:                        # 可选：模型表（与图内标注等价，�
 ```mermaid
 flowchart TD
   %% entry: plan
-  plan["计划<br/>opencode-go · mimo-v2.6-pro"] --> contract-tests["接口 + 测试<br/>opencode-go · glm-5.3-flash"]
+  plan["计划<br/>opencode-go · mimo-v2.6-pro"] --> contract-tests["接口 + 测试<br/>opencode-go · mimo-v2.6-flash"]
   contract-tests --> race{{"并行实现"}}
   race --> implement-a["实现 A<br/>opencode-go · deepseek-v4.1-flash"]
   race --> implement-b["实现 B<br/>kilo · kilo-auto/free"]
@@ -314,7 +314,7 @@ contract-tests ──► race ──┤                                    ├�
 ```yaml
 # <项目>/doc/racing-code.md 的 front-matter
 plan: opencode-go/mimo-v2.6-pro                       # 简写：provider/model
-contract-tests: opencode-go/glm-5.3-flash
+contract-tests: opencode-go/mimo-v2.6-flash
 implement-a: opencode-go/deepseek-v4.1-flash          # 赛道 1
 implement-b: kilo/kilo-auto/free                      # 赛道 2
 cr:
@@ -524,7 +524,7 @@ maxReviewRounds: 2
 ```mermaid
 flowchart TD
   %% entry: plan
-  plan["计划<br/>opencode-go · mimo-v2.6-pro"] --> contract-tests["接口 + 测试<br/>opencode-go · glm-5.3-flash"]
+  plan["计划<br/>opencode-go · mimo-v2.6-pro"] --> contract-tests["接口 + 测试<br/>opencode-go · mimo-v2.6-flash"]
   contract-tests --> race{{"并行实现"}}
   race --> implement-a["实现 A<br/>opencode-go · deepseek-v4.1-flash"]
   race --> implement-b["实现 B<br/>kilo · kilo-auto/free"]
@@ -552,7 +552,7 @@ flowchart TD
 racing-code: 1
 maxReviewRounds: 3
 models:
-  implement-c: opencode-go/glm-5.3-flash        # 第三条赛道用 front-matter 写
+  implement-c: opencode-go/mimo-v2.6-flash      # 第三条赛道用 front-matter 写
   cr:
     provider: opencode-go
     model: mimo-v2.6-pro

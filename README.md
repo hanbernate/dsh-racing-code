@@ -114,7 +114,7 @@ models:
 ```mermaid
 flowchart TD
   %% entry: plan
-  plan["Plan<br/>opencode-go · mimo-v2.6-pro"] --> contract-tests["Contract + tests<br/>opencode-go · glm-5.3-flash"]
+  plan["Plan<br/>opencode-go · mimo-v2.6-pro"] --> contract-tests["Contract + tests<br/>opencode-go · mimo-v2.6-flash"]
   contract-tests --> race{{"Parallel implement"}}
   race --> implement-a["Implement A<br/>opencode-go · deepseek-v4.1-flash"]
   race --> implement-b["Implement B<br/>kilo · kilo-auto/free"]
@@ -167,7 +167,7 @@ The "two lanes + CR review rounds" flow below is the smallest useful shape; this
 | Stage | What it does | Example route |
 |---|---|---|
 | `plan` | approach + acceptance criteria; settle the lane directory (`laneDir`): default `.worktrees` needs a `.gitignore` line, `branch` mode needs none | `opencode-go` · `mimo-v2.6-pro` |
-| `contract-tests` | signatures, contract comments, tests per contract, run once and show **red** (the **shared standard** for every lane) | `opencode-go` · `glm-5.3-flash` ⁽¹⁾ |
+| `contract-tests` | signatures, contract comments, tests per contract, run once and show **red** (the **shared standard** for every lane) | `opencode-go` · `mimo-v2.6-flash` ⁽¹⁾ |
 | `race{{Parallel implement}}` | a **parallel group** (not a stage, no route): starts all lanes at once | — |
 | `implement-a` | lane 1: implement to green inside its own worktree | `opencode-go` · `deepseek-v4.1-flash` |
 | `implement-b` | lane 2: same contract, another model, another worktree | `kilo` · `kilo-auto/free` |
@@ -176,9 +176,10 @@ The "two lanes + CR review rounds" flow below is the smallest useful shape; this
 | `gate` (user gate) | on common problems, ask the user: fix constraints and re-run, or accept | — |
 | `commit` | commit the winner; remove the losing worktree, **keep its branch** | `kilo` · `kilo-auto/free` |
 
-⁽¹⁾ Originally `mimo-v2.6-flash`: it is listed and answers non-streamed requests, but the upstream replies
-`[model_coming_soon]` to every **streamed** request, and DSH only streams — so it is unusable today (see
-[doc/compatibility.md](doc/compatibility.md) §2).
+⁽¹⁾ This cell used `glm-5.3-flash` temporarily: in the 2026-10-17 measurement `mimo-v2.6-flash` answered
+`[model_coming_soon]` to every **streamed** request, and DSH only streams. **Re-tested 2026-10-18: streamed 200**,
+so the example is back to `mimo-v2.6-flash`; both measurements are in
+[doc/compatibility.md](doc/compatibility.md) §2.1.
 
 Typical edits: add a third lane (one more out-edge plus one more stage; `maxLanes` allows 4 by default); point the
 CR at a stronger model; tighten or loosen the review loop; add a release gate. **To change models, edit labels or
@@ -288,8 +289,8 @@ Prerequisites are already in `~/.dsh/profiles/web/cordis.patch.yml` and verified
 from `apiKeyEnv` to two static headers (`x-api-key: FREE` plus `authorization: Bearer`, because the free tier
 rejects any real bearer while pi-ai refuses a credential-less route), and subagent model selection enabled —
 **every route written in your diagram must be in its `allowedModels`** (added by hand; the plugin no longer merges
-them). All four routes used below have been exercised with a real delegated child, not merely read off the
-catalog: `mimo-v2.6-pro` ✅, `glm-5.3-flash` ✅, `deepseek-v4.1-flash` ✅, `kilo · kilo-auto/free` ✅.
+them). All five routes used below have been exercised with a real delegated child, not merely read off the
+catalog: `mimo-v2.6-pro` ✅, `mimo-v2.6-flash` ✅, `glm-5.3-flash` ✅, `deepseek-v4.1-flash` ✅, `kilo · kilo-auto/free` ✅.
 
 ## 10. Layout
 

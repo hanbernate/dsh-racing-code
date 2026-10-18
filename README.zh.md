@@ -105,7 +105,7 @@ models:
 ```mermaid
 flowchart TD
   %% entry: plan
-  plan["计划<br/>opencode-go · mimo-v2.6-pro"] --> contract-tests["接口 + 测试<br/>opencode-go · glm-5.3-flash"]
+  plan["计划<br/>opencode-go · mimo-v2.6-pro"] --> contract-tests["接口 + 测试<br/>opencode-go · mimo-v2.6-flash"]
   contract-tests --> race{{"并行实现"}}
   race --> implement-a["实现 A<br/>opencode-go · deepseek-v4.1-flash"]
   race --> implement-b["实现 B<br/>kilo · kilo-auto/free"]
@@ -153,7 +153,7 @@ flowchart TD
 | 阶段 | 做什么 | 示例路由 |
 |---|---|---|
 | `plan` | 出方案、定验收标准；按 `laneDir` 确认赛道目录策略（默认 `.worktrees` 要写进 `.gitignore`；`branch` 模式不用） | `opencode-go` · `mimo-v2.6-pro` |
-| `contract-tests` | 写签名与契约注释、按契约写测试、跑一次确认**红**（**所有赛道的共同标准**） | `opencode-go` · `glm-5.3-flash` ⁽¹⁾ |
+| `contract-tests` | 写签名与契约注释、按契约写测试、跑一次确认**红**（**所有赛道的共同标准**） | `opencode-go` · `mimo-v2.6-flash` ⁽¹⁾ |
 | `race{{并行实现}}` | **并行组**（不是阶段、不需要路由）：同时发两条赛道 | — |
 | `implement-a` | 赛道 1：在自己的 worktree 里实现到绿 | `opencode-go` · `deepseek-v4.1-flash` |
 | `implement-b` | 赛道 2：同一契约、另一个模型、另一个 worktree | `kilo` · `kilo-auto/free` |
@@ -162,8 +162,9 @@ flowchart TD
 | `gate`（用户关口） | 有共同问题时问用户：完善约束重跑 / 接受现状 | — |
 | `commit` | 提交胜者；清理落败 worktree，**保留分支** | `kilo` · `kilo-auto/free` |
 
-⁽¹⁾ 原定 `mimo-v2.6-flash`：模型在目录里、非流式也能答，但**上游对流式请求一律回
-`[model_coming_soon]`**，而 DSH 只能流式，所以现在用不了（详见 [doc/compatibility.md](doc/compatibility.md) §2）。
+⁽¹⁾ 这里曾临时用 `glm-5.3-flash`：`mimo-v2.6-flash` 在 2026-10-17 的实测里对流式请求一律回
+`[model_coming_soon]`，而 DSH 只能流式。**2026-10-18 复测已放行（流式 200）**，示例改回 `mimo-v2.6-flash`；
+两次实测都记在 [doc/compatibility.md](doc/compatibility.md) §2.1。
 
 常见调整：加第三条赛道（并行组再加一条出边 + 一个阶段，`maxLanes` 默认容得下 4 条）；把 CR 换更贵的模型；
 加严/放宽复盘轮；加"发布"关口。**换模型只改标签或 front-matter，不用动结构。**
@@ -256,8 +257,8 @@ mkdir -p doc && cp <本仓库>/doc/racing-code.md doc/racing-code.md    # 或者
   `allowedModels` 里**（手动加；插件不再自动并入）；
 - `standard` / `ptc` 两个 preset 的委派工具本来就带 `modelSelectionSettings: true`，无需改动。
 
-四条**已用真实子代理调用跑通**的路由（不是只看目录）：`mimo-v2.6-pro` ✅、`glm-5.3-flash` ✅、
-`deepseek-v4.1-flash` ✅、`kilo · kilo-auto/free` ✅。
+五条**已用真实子代理调用跑通**的路由（不是只看目录）：`mimo-v2.6-pro` ✅、`mimo-v2.6-flash` ✅、
+`glm-5.3-flash` ✅、`deepseek-v4.1-flash` ✅、`kilo · kilo-auto/free` ✅。
 
 ## 10. 目录
 

@@ -9,7 +9,7 @@ models:
   contract-tests: session
   cr: session
   implement-a: opencode-go/deepseek-v4.1-flash
-  implement-b: opencode-go/glm-5.3-flash
+  implement-b: opencode-go/mimo-v2.6-flash
   commit: kilo/kilo-auto/free
 ---
 

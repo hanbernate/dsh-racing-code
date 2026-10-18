@@ -273,7 +273,7 @@ contract-tests → [race: implement-a ∥ implement-b] → cr
 cr → {存在共同问题?} --有--> (用户决定：完善约束还是接受现状) ; --无--> {每条赛道都通过?}
      (用户决定) --完善约束--> design ; --接受现状--> {每条赛道都通过?}
      {每条赛道都通过?} --否：按反馈修订--> [race] ; --是--> commit
-路由：design=opencode-go·mimo-v2.6-pro  contract-tests=opencode-go·glm-5.3-flash
+路由：design=opencode-go·mimo-v2.6-pro  contract-tests=opencode-go·mimo-v2.6-flash
       implement-a=opencode-go·deepseek-v4.1-flash  implement-b=kilo·kilo-auto/free
       cr=opencode-go·mimo-v2.6-pro  commit=kilo·kilo-auto/free
 规则：顺序阶段按声明分流——声明了 provider/model 的阶段前台 subagent 委派一次（显式传 provider/model）；

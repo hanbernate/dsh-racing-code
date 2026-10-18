@@ -135,7 +135,7 @@ models:
 
 ## 4. 生成的流程文件
 
-### 4.1 图（`full` 预设 = 本仓库自己的图，已验证可解析）
+### 4.1 图（`full` 预设 = 本仓库自己的图，2026-10-18 重新对齐，已验证可解析）
 
 ````markdown
 ---
@@ -172,9 +172,12 @@ flowchart TD
   common -- "无" --> verdict{"每条赛道都通过?"}
   gate -- "完善约束" --> design
   gate -- "接受现状" --> verdict
-  verdict -- "否：按反馈修订" --> race
+  verdict -- "否：按反馈修订" --> confirm(["用户确认：把 CR 意见发回赛道?"])
   needs-code -- "否：纯文档改动" --> commit["提交"]
   verdict -- "是" --> commit
+  confirm -- "发回修订" --> race
+  confirm -- "先完善约束" --> design
+  confirm -- "接受现状" --> commit
 ```
 
 ## 首次清单   ← 不进提示词，随文件 commit/review；确认后可删
@@ -184,6 +187,11 @@ flowchart TD
 > **声明顺序 = 阶段顺序**：`buildFlow` 按节点**首次声明**（带形状那次）的先后列出 stages，契约测试按此断言；要某阶段排最后，让它的声明出现在最后一条边上（上例 `commit` 就是这样排到最后的）。
 
 - `minimal` 预设：`plan → contract-tests → race{{}} → implement-a ∥ implement-b → cr → verdict{"每条赛道都通过?"}`，`%% entry: plan`，只留 verdict→race 一条回边。
+- **2026-10-18 重新对齐**：`full` 预设补上 `confirm`（用户确认：把 CR 意见发回赛道?）——此前它是 `verdict --"否"--> race`，
+  与本仓库 [racing-code.md](racing-code.md) 漂移。`confirm` 是用户关口（stadium 节点）、**不是阶段**，`## 阶段说明` 里没有它。
+  纯函数层已验：`resolveFlow` **0 error**、`entry: design`、阶段顺序 `design, contract-tests, implement-a, implement-b, cr, commit`、
+  回边集合 `['review confirm->race', 'stage confirm->design', 'stage final->design', 'stage gate->design']`；
+  `test/bootstrap.test.mjs` 把这条回边集合钉死——**改图必须同步改断言**。
 - 无条件写 `%% entry:`；两条回边都带条件文字；护栏显式写（3/4/2）；lane 的提示词里写死 worktree 绝对路径（[workflow-format.md](workflow-format.md) §11）。
 
 ### 4.2 `laneDir` 的自动选择

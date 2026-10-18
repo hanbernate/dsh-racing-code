@@ -157,13 +157,13 @@ profile `web`，`patchReload: live`，时间 2026-10-17。
 | 路由 | 非流式 | 流式（DSH 唯一走法） | 结论 |
 |---|---|---|---|
 | `opencode-go` · `mimo-v2.6-pro` | 200 | 200 | ✅ 可用 |
-| `opencode-go` · `glm-5.3-flash` | 200 | 200 | ✅ 可用（接口+测试阶段默认） |
+| `opencode-go` · `glm-5.3-flash` | 200 | 200 | ✅ 可用（2026-10-18 前是示例里的接口+测试阶段默认） |
 | `opencode-go` · `deepseek-v4.1-flash` | 200 | 200 | ✅ 可用 |
-| `opencode-go` · `mimo-v2.6-flash` | 200 | **400 `[model_coming_soon]`** | ❌ 现在不可用；留作备胎 |
+| `opencode-go` · `mimo-v2.6-flash` | 200 | **400 `[model_coming_soon]`** → **2026-10-18 复测 200** | ⚠️ 2026-10-17 实测不可用；**2026-10-18 复测 ✅ 流式可用**（见 §2.1） |
 | `opencode-go` · `big-pickle` | **400 `Model is unavailable`** | — | ❌ 上游已下线；免费端点 `zen/v1` 又拒绝非 OpenCode 客户端 |
 | `kilo` · `kilo-auto/free` | 200 | 200 | ✅ 可用，但需要 §3.2 的两个静态头 |
 
-### 2.1 `mimo-v2.6-flash`：流式被上游挡在"即将上线"
+### 2.1 `mimo-v2.6-flash`：2026-10-17 被挡在"即将上线"，2026-10-18 复测已放行
 
 同一个模型、同一个 key、同一个端点：
 
@@ -175,8 +175,10 @@ profile `web`，`patchReload: live`，时间 2026-10-17。
 {..., "tools":[...]}                      → 200
 ```
 
-DSH 只走流式，所以这条路由**在配置层面无解**，只能换模型或等上游。排查手法：把失败子会话的
-`session.v4.jsonl.zstd` 解出来看 `failure.message`，再拿同样形状的请求打一次上游。
+DSH 只走流式，所以当时这条路由**在配置层面无解**，只能换模型或等上游——**2026-10-18 复测：流式 200**
+（本仓库用真实子代理调用跑通，回 `PROBE-OK`），`[model_coming_soon]` 已消失，可正常使用。
+排查手法：把失败子会话的 `session.v4.jsonl.zstd` 解出来看 `failure.message`，再拿同样形状的请求打一次上游；
+**结论必须带日期**——这条路由本身就是"上游会变"的例子。
 
 ### 2.2 `kilo`：免费档认 `x-api-key`，不认 bearer
 
@@ -236,7 +238,7 @@ return { ok: text !== null, reply: text === null ? null : String(text).trim().sl
 
 ### 2.4 结论
 
-**模型清单会腐烂，而且会以三种不同方式腐烂**：下线（`big-pickle`）、未开放流式（`mimo-v2.6-flash`）、
+**模型清单会腐烂，而且会以三种不同方式腐烂**：下线（`big-pickle`）、未开放流式（`mimo-v2.6-flash`，2026-10-17 实测、2026-10-18 已放行）、
 需要特殊鉴权头（`kilo`）。所以：
 
 - 页面下拉以**实时目录**为准，并允许手工填路由；
