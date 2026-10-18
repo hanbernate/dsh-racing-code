@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
-  attachInstructions, buildFlow, buildLanes, buildLoops, checkAuthorized, checkLabelShadowing,
+  assignRuntimeRoutes, attachInstructions, buildFlow, buildLanes, buildLoops, checkAuthorized, checkLabelShadowing,
   checkReviewer, classifyBackEdges, classifyEdges, diagnose, laneAgentName, laneAgentNameLine,
   mergeRoutes, parseFrontMatter,
   parseMermaid, parseNodeLabel, parseYamlSubset, renderMermaid, renderPolicySection, resolveEntry,
@@ -728,3 +728,99 @@ test('the repository flow file still resolves when the allowlist is unavailable'
   assert.equal(resolved.ok, true)
   assert.deepEqual(resolved.problems, [])
 })
+
+// ─────────────────────────── runtime routes (plan §5) ───────────────────────────
+
+const POOL = [
+  { provider: 'opencode-go', model: 'deepseek-v4.1-flash' },
+  { provider: 'kilo', model: 'kilo-auto/free' },
+  { provider: 'opencode-go', model: 'glm-5.3-flash' },
+]
+const routeKey = route => (route === null || route === undefined ? null : route.provider + '/' + route.model)
+
+test('mergeRoutes: auto delegates on a runtime route, and a pool makes a missing lane normal', () => {
+  const { stages, problems } = mergeRoutes(
+    [{ id: 'plan' }, { id: 'implement-a', lane: { joinAt: 'cr' } }, { id: 'commit' }],
+    { plan: 'session', commit: 'auto' },
+    null,
+    { runtimeAvailable: true },
+  )
+  const commit = stages.find(stage => stage.id === 'commit')
+  assert.equal(commit.routeSource, 'auto', 'auto is the "delegate, resolve at runtime" sentinel')
+  assert.equal(commit.route, null)
+  assert.equal(commit.fallback, true)
+  assert.ok(!has(problems, 'FLOW_ROUTE_MALFORMED'), codes(problems).join(','))
+  assert.equal(stages.find(stage => stage.id === 'plan').routeSource, 'session')
+  assert.equal(stages.find(stage => stage.id === 'implement-a').routeSource, 'auto',
+    'a lane is never "missing" while a pool exists')
+  assert.ok(!has(problems, 'FLOW_ROUTE_MISSING'), codes(problems).join(','))
+
+  // Without a pool the pre-plan contract holds: a lane without a route warns and inherits.
+  const legacy = mergeRoutes([{ id: 'implement-a', lane: { joinAt: 'cr' } }], {}, null)
+  assert.ok(has(legacy.problems, 'FLOW_ROUTE_MISSING'))
+  assert.equal(legacy.stages[0].routeSource, null)
+})
+
+test('assignRuntimeRoutes: stable order, and a declared route reserves its slot', () => {
+  const stages = [
+    { id: 'implement-a', lane: {}, routeSource: 'auto', fallback: true, route: null },
+    { id: 'implement-b', lane: {}, routeSource: 'auto', fallback: true, route: null },
+    { id: 'cr', routeSource: 'front-matter', fallback: false, route: { provider: 'kilo', model: 'kilo-auto/free' } },
+  ]
+  const { stages: out, problems } = assignRuntimeRoutes(stages, POOL)
+  const stage = id => out.find(item => item.id === id)
+  assert.equal(routeKey(stage('implement-a').route), 'opencode-go/deepseek-v4.1-flash', 'first free entry')
+  assert.equal(routeKey(stage('implement-b').route), 'opencode-go/glm-5.3-flash', 'the slot cr reserved is skipped')
+  assert.equal(stage('implement-a').routeSource, 'runtime')
+  assert.equal(stage('implement-a').fallback, false)
+  assert.equal(stage('implement-a').authorized, true)
+  assert.equal(stage('cr').routeSource, 'front-matter', 'a declared route inside the pool stays declared')
+  assert.deepEqual(codes(problems), [])
+  assert.equal(stages[0].route, null, 'pure: the input is untouched')
+})
+
+test('assignRuntimeRoutes: exhaustion, an unavailable pool and a rotten declared route', () => {
+  const auto = id => ({ id, lane: {}, routeSource: 'auto', fallback: true, route: null })
+
+  const short = assignRuntimeRoutes([auto('implement-a'), auto('implement-b'), auto('commit')], POOL.slice(0, 2))
+  const starved = short.stages.find(stage => stage.id === 'commit')
+  assert.equal(routeKey(starved.route), null)
+  assert.equal(starved.routeSource, 'auto')
+  assert.equal(starved.fallback, true)
+  assert.equal(short.problems.filter(problem => problem.code === 'FLOW_ROUTE_UNRESOLVED').length, 1,
+    'only the starved stage warns')
+
+  const off = assignRuntimeRoutes([auto('implement-a')], null)
+  assert.equal(off.stages[0].route, null)
+  assert.equal(off.stages[0].routeSource, 'auto')
+  assert.ok(has(off.problems, 'FLOW_ROUTE_UNRESOLVED'), 'an unavailable directory is reported, not silent')
+
+  const rotten = assignRuntimeRoutes([
+    { id: 'commit', routeSource: 'front-matter', fallback: false, route: { provider: 'gone', model: 'x' } },
+  ], POOL)
+  assert.ok(has(rotten.problems, 'FLOW_ROUTE_UNAVAILABLE'), codes(rotten.problems).join(','))
+  assert.equal(routeKey(rotten.stages[0].route), 'opencode-go/deepseek-v4.1-flash',
+    'still delegates: it takes the next free route')
+  assert.equal(rotten.stages[0].routeSource, 'runtime')
+})
+
+test('resolveFlow: a runtime pool fills the lanes and the section labels them', () => {
+  const text = doc(['racing-code: 1', 'models:', '  start: session', '  cr: session', '  done: session'], LANES)
+  const resolved = resolveFlow(text, { runtimePool: POOL })
+  assert.equal(resolved.ok, true)
+  assert.equal(routeKey(byId(resolved, 'lane-a').route), 'opencode-go/deepseek-v4.1-flash')
+  assert.equal(routeKey(byId(resolved, 'lane-b').route), 'kilo/kilo-auto/free')
+  assert.equal(byId(resolved, 'lane-a').routeSource, 'runtime')
+  assert.ok(!has(resolved.problems, 'FLOW_ROUTE_MISSING'), codes(resolved.problems).join(','))
+
+  const section = renderPolicySection(resolved)
+  assert.match(section, /lane-a=opencode-go·deepseek-v4\.1-flash（运行时解析）/)
+  assert.match(section, /lane-b=kilo·kilo-auto\/free（运行时解析）/)
+
+  // Boundary: omitting the pool keeps the pre-plan behaviour exactly.
+  const legacy = resolveFlow(text, {})
+  assert.ok(has(legacy.problems, 'FLOW_ROUTE_MISSING'))
+  assert.equal(byId(legacy, 'lane-a').routeSource, null)
+  assert.equal(byId(legacy, 'lane-a').route, null)
+})
+

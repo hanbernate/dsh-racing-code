@@ -75,7 +75,7 @@ function makeAgent(cwd = CWD, { parent } = {}) {
   }
 }
 
-function makeCtx({ files = {}, watch = 'ok', agents = [], git = 'worktree-container' } = {}) {
+function makeCtx({ files = {}, watch = 'ok', agents = [], git = 'worktree-container', services = {} } = {}) {
   const handlers = new Map()
   const cleanups = []
   const logs = { warn: [] }
@@ -143,7 +143,7 @@ function makeCtx({ files = {}, watch = 'ok', agents = [], git = 'worktree-contai
   const ctx = {
     fs,
     logger: { warn: message => logs.warn.push(message), info: () => {}, debug: () => {} },
-    get: () => undefined,
+    get: name => services[name],
     agents: { list: () => agents },
     on(event, handler) {
       const list = handlers.get(event) ?? []
@@ -565,3 +565,224 @@ test('an unreadable file is reported as a diagnostic, not silence', async () => 
   assert.equal(agent.registered.sections.length, 1)
   assert.match(agent.registered.sections[0].text(), /FLOW_FILE_UNREADABLE/)
 })
+
+// ─────────────────────── the DSH side: directory, allowlist, runtime (plan §3 + §5) ───────────────────────
+
+/** The llm directory the fake DSH advertises, per provider, in directory order. */
+const DIRECTORY = {
+  'opencode-go': ['deepseek-v4.1-flash', 'glm-5.3-flash'],
+  kilo: ['kilo-auto/free'],
+}
+
+/**
+ * The DSH services racing-code reads: the subagent allowlist, the settings writer behind it
+ * and the llm directory. updates records every settings mutation the plugin makes.
+ */
+function dshServices({ allowed = ROUTES, enabled = true, conflict = 0, settings = true, directory = DIRECTORY } = {}) {
+  const updates = []
+  let routes = allowed.map(route => ({ ...route }))
+  let current = directory
+  let revision = 7
+  let conflictsLeft = conflict
+  const service = {
+    describe: () => [{
+      ns: 'subagent-model-selection-settings',
+      revision,
+      value: { enabled, allowedModels: routes.map(route => ({ ...route })) },
+    }],
+    async update(ns, patch, expected) {
+      if (conflictsLeft > 0) {
+        conflictsLeft--
+        revision++
+        const error = new Error('settings namespace changed since it was read')
+        error.code = 'SETTINGS_CONFLICT'
+        throw error
+      }
+      updates.push({ ns, patch, expected })
+      routes = patch.allowedModels.map(route => ({ ...route }))
+      revision++
+    },
+  }
+  const services = {
+    subagentModelSelection: { current: () => ({ enabled, allowedModels: routes.map(route => ({ ...route })) }) },
+    llm: {
+      listProviders: () => Object.keys(current).map(id => ({ id, name: id })),
+      listModels: async provider => (current[provider] ?? []).map(id => ({ provider, id, name: id })),
+    },
+  }
+  if (settings) services.settings = service
+  return { services, updates, setDirectory: next => { current = next } }
+}
+
+const keys = list => list.map(route => route.provider + '/' + route.model)
+/** One pick outside the allowlist (glm-5.3-flash) and one inside it (kilo-auto/free). */
+const UNALLOWED_PICK = { 'implement-a': 'opencode-go/glm-5.3-flash', 'implement-b': 'kilo/kilo-auto/free' }
+
+test('host_init_tabs_offer_the_whole_directory_and_mark_unauthorized_models', async () => {
+  const dsh = dshServices()
+  const { harness, tool } = await bootstrapHarness({ services: dsh.services })
+  const result = await tool.execute({}, {})
+
+  const node = result.nodes.find(item => item.id === 'implement-a')
+  assert.deepEqual(keys(node.candidates),
+    ['opencode-go/deepseek-v4.1-flash', 'opencode-go/glm-5.3-flash', 'kilo/kilo-auto/free'],
+    'the whole directory, in directory order')
+  assert.equal(node.candidates.find(candidate => candidate.model === 'glm-5.3-flash').authorized, false)
+  assert.equal(node.candidates.find(candidate => candidate.model === 'glm-5.3-flash').willAllowlist, true)
+
+  const rendered = tool.output.render({}, result)[0].text
+  assert.match(rendered, /opencode-go\/glm-5\.3-flash/)
+  assert.match(rendered, /未授权（选中后自动加入白名单）/)
+  assert.equal(harness.fs.calls.writeText, 0, 'a preview writes nothing, including the allowlist')
+  assert.deepEqual(dsh.updates, [])
+})
+
+test('host_init_write_appends_the_picked_route_to_the_allowlist', async () => {
+  const dsh = dshServices()
+  const { harness, tool } = await bootstrapHarness({ services: dsh.services })
+  const result = await tool.execute({ write: true, models: UNALLOWED_PICK }, {})
+
+  assert.equal(result.wrote, true)
+  assert.equal(dsh.updates.length, 1, 'one revision-fenced append')
+  assert.equal(dsh.updates[0].ns, 'subagent-model-selection-settings')
+  assert.equal(dsh.updates[0].expected, 7, 'the revision describe() returned')
+  assert.deepEqual(keys(dsh.updates[0].patch.allowedModels), [
+    'opencode-go/mimo-v2.6-pro', 'opencode-go/deepseek-v4.1-flash', 'kilo/kilo-auto/free', 'opencode-go/glm-5.3-flash',
+  ], 'append-only: existing entries keep their order')
+  assert.ok(result.diagnostics.some(line => line.includes('BOOTSTRAP_ALLOWLIST_ADDED')), result.diagnostics.join(' | '))
+  assert.equal(harness.fs.writes.length, 1, 'the flow file still lands')
+})
+
+test('host_init_write_appends_nothing_when_the_picks_are_already_allowed', async () => {
+  const dsh = dshServices()
+  const { tool } = await bootstrapHarness({ services: dsh.services })
+  const result = await tool.execute({ write: true, models: LANE_MODELS }, {})
+  assert.equal(result.wrote, true)
+  assert.deepEqual(dsh.updates, [], 'nothing to append')
+  assert.ok(result.diagnostics.some(line => line.includes('BOOTSTRAP_ALLOWLIST_NOOP')), result.diagnostics.join(' | '))
+})
+
+test('host_init_retries_once_when_the_allowlist_moved_under_it', async () => {
+  const dsh = dshServices({ conflict: 1 })
+  const { tool } = await bootstrapHarness({ services: dsh.services })
+  const result = await tool.execute({ write: true, models: UNALLOWED_PICK }, {})
+  assert.equal(result.wrote, true)
+  assert.equal(dsh.updates.length, 1, 'the retry lands')
+  assert.equal(dsh.updates[0].expected, 8, 'the revision re-read after the conflict')
+  assert.ok(result.diagnostics.some(line => line.includes('BOOTSTRAP_ALLOWLIST_ADDED')), result.diagnostics.join(' | '))
+})
+
+test('host_init_reports_a_persistent_allowlist_conflict_and_still_writes_the_flow', async () => {
+  const dsh = dshServices({ conflict: 5 })
+  const { harness, tool } = await bootstrapHarness({ services: dsh.services })
+  const result = await tool.execute({ write: true, models: UNALLOWED_PICK }, {})
+  assert.equal(result.wrote, true, 'the allowlist never blocks the flow file')
+  assert.deepEqual(dsh.updates, [])
+  assert.ok(result.diagnostics.some(line => line.includes('BOOTSTRAP_ALLOWLIST_CONFLICT')), result.diagnostics.join(' | '))
+  assert.equal(harness.fs.writes.length, 1)
+})
+
+test('host_init_degrades_without_a_settings_service', async () => {
+  const dsh = dshServices({ settings: false })
+  const { harness, tool } = await bootstrapHarness({ services: dsh.services })
+  const result = await tool.execute({ write: true, models: UNALLOWED_PICK }, {})
+  assert.equal(result.wrote, true)
+  assert.ok(result.diagnostics.some(line => line.includes('BOOTSTRAP_ALLOWLIST_UNAVAILABLE')), result.diagnostics.join(' | '))
+  assert.equal(harness.fs.writes.length, 1)
+})
+
+test('host_init_does_not_allowlist_when_model_selection_is_disabled', async () => {
+  const dsh = dshServices({ enabled: false })
+  const { tool } = await bootstrapHarness({ services: dsh.services })
+  const result = await tool.execute({ write: true, models: UNALLOWED_PICK }, {})
+  assert.equal(result.wrote, true)
+  assert.deepEqual(dsh.updates, [], 'a disabled allowlist imposes no policy, so there is nothing to append')
+  assert.ok(result.diagnostics.some(line => line.includes('BOOTSTRAP_ALLOWLIST_DISABLED')), result.diagnostics.join(' | '))
+})
+
+test('host_init_only_touches_the_allowlist_after_every_check_passes', async () => {
+  const dsh = dshServices()
+  const { harness, tool } = await bootstrapHarness({ services: dsh.services })
+
+  const refused = await tool.execute({ write: true, models: {} }, {})
+  assert.equal(refused.wrote, false)
+  assert.equal(harness.fs.calls.writeText, 0)
+  assert.deepEqual(dsh.updates, [], 'a refusal has zero side effects')
+
+  // The successful call does append, so the guard above is not vacuous.
+  const written = await tool.execute({ write: true, models: UNALLOWED_PICK }, {})
+  assert.equal(written.wrote, true)
+  assert.equal(dsh.updates.length, 1, 'exactly one append, from the successful call')
+})
+
+// ─────────────────────────── runtime resolution in a live session (plan §5) ───────────────────────────
+
+/** A flow whose lanes carry no models at all: exactly what plan §5 makes the normal shape. */
+const RUNTIME_FLOW = [
+  '---',
+  'racing-code: 1',
+  'models:',
+  '  start: session',
+  '  cr: session',
+  '  done: session',
+  '---',
+  '',
+  '# Flow',
+  '',
+  '```mermaid',
+  'flowchart TD',
+  '  %% entry: start',
+  '  start["Start"] --> race{{"Race"}}',
+  '  race --> lane-a["Lane A"]',
+  '  race --> lane-b["Lane B"]',
+  '  lane-a --> cr["CR"]',
+  '  lane-b --> cr',
+  '  cr --> done["Done"]',
+  '```',
+  '',
+].join('\n')
+
+/** A project with a working flow file: the read-only surface, no bootstrap entry. */
+async function flowHarness(options = {}) {
+  const harness = makeCtx(options)
+  apply(harness.ctx, options.config ?? {})
+  const agent = makeAgent(options.cwd === undefined ? CWD : options.cwd)
+  await harness.emit('agent/created', { agent })
+  const tool = agent.registered.tools.find(item => item.name === TOOL_NAME)
+  assert.ok(tool, TOOL_NAME + ' must be registered')
+  return { harness, agent, tool }
+}
+
+test('host_runtime_routes_are_resolved_from_the_directory_not_the_file', async () => {
+  const dsh = dshServices()
+  const { agent, tool } = await flowHarness({ files: { [FILE]: RUNTIME_FLOW }, services: dsh.services })
+  const result = await tool.execute({}, {})
+
+  assert.match(result.details, /lane-a=opencode-go·deepseek-v4\.1-flash（运行时解析）/)
+  assert.match(result.details, /lane-b=kilo·kilo-auto\/free（运行时解析）/)
+  assert.deepEqual(result.problems, [], 'a resolved lane is no longer a FLOW_ROUTE_MISSING warning')
+  assert.match(agent.registered.sections[0].text(), /（运行时解析）/)
+})
+
+test('host_runtime_pool_never_uses_a_model_outside_the_allowlist', async () => {
+  const dsh = dshServices({ allowed: [{ provider: 'opencode-go', model: 'glm-5.3-flash' }] })
+  const { tool } = await flowHarness({ files: { [FILE]: RUNTIME_FLOW }, services: dsh.services })
+  const result = await tool.execute({}, {})
+
+  assert.match(result.details, /lane-a=opencode-go·glm-5\.3-flash（运行时解析）/)
+  assert.match(result.details, /lane-b=（用当前会话模型委派）/, 'the second lane has no second authorized route')
+  assert.ok(result.problems.some(line => line.includes('FLOW_ROUTE_UNRESOLVED')), result.problems.join(' | '))
+})
+
+test('host_llm_adapters_updated_re_resolves_the_routes', async () => {
+  const dsh = dshServices()
+  const { agent, harness } = await flowHarness({ files: { [FILE]: RUNTIME_FLOW }, services: dsh.services })
+  assert.match(agent.registered.sections[0].text(), /deepseek-v4\.1-flash/)
+
+  dsh.setDirectory({ 'opencode-go': ['glm-5.3-flash', 'mimo-v2.6-pro'], kilo: [] })
+  await harness.emit('llm/adapters-updated')
+  await tick()
+  await tick()
+  assert.match(agent.registered.sections[0].text(), /lane-a=opencode-go·glm-5\.3-flash（运行时解析）/)
+})
+

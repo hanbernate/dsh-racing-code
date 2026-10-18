@@ -35,8 +35,16 @@ const key = route => `${route.provider}/${route.model}`
 const codes = (resolved, level) => resolved.problems.filter(p => level === undefined || p.level === level).map(p => p.code)
 const byId = (resolved, id) => resolved.stages.find(stage => stage.id === id)
 
+/** Gate-2 tabs for the shared stage list; the allowlist is writable unless overridden. */
+function choices(overrides = {}) {
+  return buildRouteChoices({
+    allowedModels: ALLOWED, catalog: CATALOG, allowlistWritable: true, stages: STAGES, lanes: LANES, ...overrides,
+  })
+}
+
 /** Facts for buildPlan: a ready-to-bootstrap worktree container unless overridden. */
 function facts(overrides = {}) {
+  const built = choices()
   return {
     file: '/projects/demo/docs/racing-code.md',
     fileExists: false,
@@ -44,8 +52,8 @@ function facts(overrides = {}) {
     gitLayout: 'worktree-container',
     laneDir: 'branch',
     gitignore: null,
-    nodes: buildRouteChoices({ allowedModels: ALLOWED, catalog: CATALOG, stages: STAGES, lanes: LANES }).nodes,
-    candidates: CATALOG,
+    nodes: built.nodes,
+    candidates: built.nodes[0]?.candidates ?? [],
     ...overrides,
   }
 }
@@ -178,31 +186,62 @@ test('bootstrap_nodes_in_flow_order_with_required_lanes', () => {
   assert.match(text, /自评|偏好/, 'the CR question must warn about reviewing a lane it shares a model with')
 })
 
-test('bootstrap_candidates_intersect_allowlist_and_catalog', () => {
-  const { nodes } = buildRouteChoices({ allowedModels: ALLOWED, catalog: CATALOG, stages: STAGES, lanes: LANES })
-  const expected = ['kilo/kilo-auto/free', 'opencode-go/deepseek-v4.1-flash']
+test('bootstrap_candidates_are_the_whole_llm_directory', () => {
+  const { nodes } = choices()
+  const expected = CATALOG.map(key)
   for (const node of nodes) {
-    assert.deepEqual(node.candidates.map(key).sort(), expected, `${node.id} offers allowlist ∩ catalog`)
-    assert.ok(node.candidates.every(candidate => candidate.authorized === true))
+    assert.deepEqual(node.candidates.map(key), expected, node.id + ' offers the whole directory, in directory order')
   }
-  assert.equal(nodes[0].candidates.find(candidate => candidate.model === 'deepseek-v4.1-flash').note, '与 contract-tests 同款')
-
-  // The allowlist service being unavailable skips the check instead of hiding every route.
-  const open = buildRouteChoices({ allowedModels: null, catalog: CATALOG, stages: STAGES, lanes: LANES })
-  assert.deepEqual(open.nodes[0].candidates.map(key).sort(),
-    ['kilo/kilo-auto/free', 'opencode-go/deepseek-v4.1-flash', 'opencode-go/glm-5.3-flash', 'other-vendor/x-large'])
-  assert.ok(open.nodes[0].candidates.every(candidate => candidate.authorized === true))
+  const find = model => nodes[0].candidates.find(candidate => candidate.model === model)
+  assert.equal(find('deepseek-v4.1-flash').authorized, true, 'already in the allowlist')
+  assert.equal(find('deepseek-v4.1-flash').willAllowlist, false)
+  assert.equal(find('kilo-auto/free').authorized, true)
+  assert.equal(find('glm-5.3-flash').authorized, false, 'advertised but not allowed yet')
+  assert.equal(find('glm-5.3-flash').willAllowlist, true, 'picking it appends it')
+  assert.equal(find('x-large').authorized, false)
+  assert.equal(find('x-large').willAllowlist, true)
+  assert.equal(find('deepseek-v4.1-flash').note, '与 contract-tests 同款', 'the directory note survives')
 })
 
-test('bootstrap_no_candidates_keeps_session_option', () => {
-  const { nodes, notes } = buildRouteChoices({ allowedModels: [], catalog: CATALOG, stages: STAGES, lanes: LANES })
-  assert.ok(nodes.length > 0)
-  for (const node of nodes) {
-    assert.deepEqual(node.candidates, [], 'a known-empty allowlist leaves no candidate')
-    assert.equal(node.default, 'session', 'the session option always stays')
-    assert.equal(node.required, node.kind === 'lane')
-  }
-  assert.ok(notes.some(note => note.includes('BOOTSTRAP_NO_CANDIDATES')), notes.join(' | '))
+test('bootstrap_unauthorized_candidates_say_the_host_will_allowlist_them', () => {
+  const { notes } = choices()
+  assert.ok(notes.some(note => note.includes('BOOTSTRAP_ALLOWLIST_WILL_ADD')), notes.join(' | '))
+
+  const readOnly = choices({ allowlistWritable: false })
+  assert.ok(readOnly.nodes[0].candidates.every(candidate => candidate.willAllowlist === false),
+    'without a writable allowlist nothing is promised to the user')
+  assert.ok(!readOnly.notes.some(note => note.includes('BOOTSTRAP_ALLOWLIST_WILL_ADD')), readOnly.notes.join(' | '))
+})
+
+test('bootstrap_candidates_never_hide_behind_the_allowlist', () => {
+  // Boundary: an empty allowlist is a decision, not a reason to hide the directory.
+  const empty = choices({ allowedModels: [] })
+  assert.ok(empty.nodes.every(node => node.candidates.length > 0), 'the directory is still offered')
+  assert.ok(empty.nodes[0].candidates.every(candidate => candidate.authorized === false && candidate.willAllowlist === true))
+  assert.ok(!empty.notes.some(note => note.includes('BOOTSTRAP_NO_CANDIDATES')), empty.notes.join(' | '))
+
+  // Failure path: the allowlist service is unavailable — skip the check, promise nothing.
+  const open = choices({ allowedModels: null })
+  assert.deepEqual(open.nodes[0].candidates.map(key), CATALOG.map(key))
+  assert.ok(open.nodes[0].candidates.every(candidate => candidate.authorized === true && candidate.willAllowlist === false))
+  assert.ok(open.notes.some(note => note.includes('BOOTSTRAP_ALLOWLIST_UNAVAILABLE')), open.notes.join(' | '))
+
+  // Only a missing or empty directory leaves zero candidates.
+  const missing = choices({ catalog: null })
+  assert.ok(missing.nodes.every(node => node.candidates.length === 0))
+  assert.equal(missing.nodes[0].default, 'session', 'the session option always stays')
+  assert.equal(missing.nodes[0].required, false)
+  assert.ok(missing.notes.some(note => note.includes('BOOTSTRAP_NO_CANDIDATES')), missing.notes.join(' | '))
+})
+
+test('bootstrap_plan_names_the_directory_and_the_unauthorized_entries', () => {
+  const plan = buildPlan(facts())
+  assertPlanShape(plan)
+  const item = plan.find(entry => entry.item === 'candidates')
+  assert.ok(item, 'the plan always reports the candidate pool')
+  assert.equal(item.status, 'ok')
+  assert.match(item.detail, /llm 目录/)
+  assert.match(item.detail, /未授权/)
 })
 
 // ─────────────────────────────── the pre-flight plan ───────────────────────────────
@@ -298,6 +337,8 @@ test('bootstrap_protocol_has_two_gates', () => {
   assert.match(text, /write\s*:\s*true/, 'the write comes after both gates')
   assert.match(text, /预览|preview/i)
   assert.match(text, /新开会话/)
+  assert.match(text, /llm 目录/, 'step 7 must say where the candidates come from')
+  assert.match(text, /白名单/, 'step 7 must say what happens to a pick outside the allowlist')
 
   const at = pattern => {
     const index = text.search(pattern)
