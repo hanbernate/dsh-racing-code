@@ -158,7 +158,7 @@ flowchart TD
 | `race{{并行实现}}` | **并行组**（不是阶段、不需要路由）：同时发两条赛道 | — |
 | `implement-a` | 赛道 1：在自己的 worktree 里实现到绿 | `opencode-go` · `deepseek-v4.1-flash` |
 | `implement-b` | 赛道 2：同一契约、另一个模型、另一个 worktree | `kilo` · `kilo-auto/free` |
-| `cr` | 逐轮评审：每 lane 评分/问题 → **单赛道问题发回该赛道**、**共同问题问用户** → 全部通过那轮给胜者 | `opencode-go` · `mimo-v2.6-pro` |
+| `cr` | 逐轮评审：每 lane 评分/问题 → **单赛道问题发回该赛道**、**共同问题问用户** → 全部通过那轮给胜者；**都通过且无明显问题时，改动少的胜出** | `opencode-go` · `mimo-v2.6-pro` |
 | `common` / `verdict` | 两个判定：有没有共同问题？每条赛道都通过了吗？ | — |
 | `gate`（用户关口） | 有共同问题时问用户：完善约束重跑 / 接受现状 | — |
 | `commit` | 提交胜者；清理落败 worktree，**保留分支** | `kilo` · `kilo-auto/free` |

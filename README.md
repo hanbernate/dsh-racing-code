@@ -171,7 +171,7 @@ The "two lanes + CR review rounds" flow below is the smallest useful shape; this
 | `race{{Parallel implement}}` | a **parallel group** (not a stage, no route): starts all lanes at once | — |
 | `implement-a` | lane 1: implement to green inside its own worktree | `opencode-go` · `deepseek-v4.1-flash` |
 | `implement-b` | lane 2: same contract, another model, another worktree | `kilo` · `kilo-auto/free` |
-| `cr` | reviews each round: per-lane score and issues → **single-lane problems go back to that lane**, **common problems go to the user** → a winner only in the round where every lane passes | `opencode-go` · `mimo-v2.6-pro` |
+| `cr` | reviews each round: per-lane score and issues → **single-lane problems go back to that lane**, **common problems go to the user** → a winner only in the round where every lane passes; **when both pass with no obvious problems, the smaller change wins** | `opencode-go` · `mimo-v2.6-pro` |
 | `common` / `verdict` | two decisions: any common problems? is every lane passing? | — |
 | `gate` (user gate) | on common problems, ask the user: fix constraints and re-run, or accept | — |
 | `commit` | commit the winner; remove the losing worktree, **keep its branch** | `kilo` · `kilo-auto/free` |
