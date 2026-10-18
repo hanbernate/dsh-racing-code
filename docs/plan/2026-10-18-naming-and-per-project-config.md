@@ -72,7 +72,8 @@ maxReviewRounds: 2
 
 **优先级**
 
-- `flowPath` / `workBranch` / `enabled` / `bootstrapEnabled`：项目配置 > 全局 Config 兜底。
+- `flowPath` / `workBranch` / `bootstrapEnabled`：项目配置 > 全局 Config 兜底。
+- `enabled`：全局 `enabled: false` 是**硬总开关**（不读盘）；项目 `enabled: false` 可逐项目退出，但不能把全局关掉的总开关重新打开。
 - 护栏：flow front-matter > 项目配置 > 全局 Config。
 - `flowPath` 归一化后必须留在会话 cwd 之内（沿用 `checkBootstrapTarget` 的包含性校验）。
 - 配置文件存在但解析失败 → `FLOW_PROJECT_CONFIG_INVALID`（warn），按全局兜底继续，不崩。
