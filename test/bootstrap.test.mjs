@@ -120,7 +120,23 @@ test('bootstrap_entry_and_labeled_back_edges', () => {
 
   const full = resolveFlow(renderBootstrapTemplate({ template: 'full', lanes: 2 }), {})
   assert.deepEqual(full.loops.map(loop => `${loop.kind} ${loop.via}->${loop.backTo}`).sort(),
-    ['review verdict->race', 'stage final->design', 'stage gate->design'])
+    ['review confirm->race', 'stage confirm->design', 'stage final->design', 'stage gate->design'])
+})
+
+test('bootstrap_full_template_carries_the_confirm_user_gate', () => {
+  const resolved = resolveFlow(renderBootstrapTemplate({ template: 'full', lanes: 2 }), {})
+  assert.deepEqual(codes(resolved, 'error'), [])
+
+  const confirm = resolved.nodes.find(item => item.id === 'confirm')
+  assert.ok(confirm, 'the full preset has the confirm user gate (parity with doc/racing-code.md)')
+  assert.equal(confirm.kind, 'user_gate')
+  assert.deepEqual(confirm.next.map(edge => edge.to).sort(), ['commit', 'design', 'race'])
+  assert.deepEqual(confirm.next.map(edge => edge.when).sort(), ['先完善约束', '发回修订', '接受现状'])
+
+  const verdict = resolved.nodes.find(item => item.id === 'verdict')
+  assert.deepEqual(verdict.next.map(edge => edge.to).sort(), ['commit', 'confirm'],
+    'the review loop goes back through the user gate, never straight to race')
+  assert.ok(!resolved.stages.some(stage => stage.id === 'confirm'), 'a user gate is not a stage')
 })
 
 test('bootstrap_preview_renders_all_stages_as_session', () => {

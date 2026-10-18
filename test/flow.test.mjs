@@ -640,7 +640,7 @@ test('laneAgentNameLine: one lane-id=name per lane stage, in declaration order',
   const line = laneAgentNameLine(resolveFlow(REAL, {}).stages)
   assert.match(line, /^子代理显示名：/)
   assert.match(line, /implement-a=implement-deepseek-v4\.1-flash/)
-  assert.match(line, /implement-b=implement-glm-5\.3-flash/)
+  assert.match(line, /implement-b=implement-mimo-v2\.6-flash/)
 })
 
 test('laneAgentNameLine: a flow without lanes has no name line', () => {
@@ -703,6 +703,7 @@ test('the repository flow file resolves cleanly, with lanes and a review loop', 
   const resolved = resolveFlow(REAL, {
     allowedModels: [
       { provider: 'opencode-go', model: 'mimo-v2.6-pro' },
+      { provider: 'opencode-go', model: 'mimo-v2.6-flash' },
       { provider: 'opencode-go', model: 'glm-5.3-flash' },
       { provider: 'opencode-go', model: 'deepseek-v4.1-flash' },
       { provider: 'kilo', model: 'kilo-auto/free' },

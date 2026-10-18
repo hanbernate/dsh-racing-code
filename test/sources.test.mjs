@@ -210,6 +210,7 @@ test('smoke: the repository flow file loads through the real filesystem', async 
   const source = await loadFlow(realFs, cwd, CONFIG, {
     allowedModels: [
       { provider: 'opencode-go', model: 'mimo-v2.6-pro' },
+      { provider: 'opencode-go', model: 'mimo-v2.6-flash' },
       { provider: 'opencode-go', model: 'glm-5.3-flash' },
       { provider: 'opencode-go', model: 'deepseek-v4.1-flash' },
       { provider: 'kilo', model: 'kilo-auto/free' },
