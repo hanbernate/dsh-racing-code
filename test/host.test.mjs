@@ -439,6 +439,59 @@ test('host_init_reports_restart_required', async () => {
   assert.match(result.nextStep, /生效/)
 })
 
+test('host_init_stamps_the_session_sandbox_policy_on_write', async () => {
+  const { harness, agent, tool } = await bootstrapHarness()
+  const requests = []
+  const policy = { mode: 'danger-full-access', workspaceRoot: CWD }
+  harness.ctx.get = name => name === 'sandboxPolicy'
+    ? { resolve: request => { requests.push(request); return policy } }
+    : undefined
+  let stamped = 'unset'
+  harness.fs.writeText = async (target, content, expected, signal, sandboxPolicy) => {
+    stamped = sandboxPolicy
+    return { operation: 'create', version: 'v1', before: null, after: content }
+  }
+
+  const result = await tool.execute({ write: true, models: LANE_MODELS }, {})
+  assert.equal(result.wrote, true)
+  assert.deepEqual(requests[0], { session: agent.session }, 'the policy is resolved for THIS session')
+  assert.equal(stamped, policy, 'the resolved session policy reaches fs.writeText')
+})
+
+test('host_init_passes_through_a_narrower_session_policy', async () => {
+  const { harness, tool } = await bootstrapHarness()
+  const policy = { mode: 'workspace-write', workspaceRoot: CWD + '/narrow' }
+  harness.ctx.get = name => name === 'sandboxPolicy'
+    ? { resolve: () => policy }
+    : undefined
+  let stamped = 'unset'
+  harness.fs.writeText = async (target, content, expected, signal, sandboxPolicy) => {
+    stamped = sandboxPolicy
+    return { operation: 'create', version: 'v1', before: null, after: content }
+  }
+
+  const result = await tool.execute({ write: true, models: LANE_MODELS }, {})
+  assert.equal(result.wrote, true)
+  assert.equal(stamped, policy, 'the session mode is passed through unchanged, not hard-coded')
+})
+
+test('host_init_degrades_when_the_policy_resolver_throws', async () => {
+  const { harness, tool } = await bootstrapHarness()
+  harness.ctx.get = name => name === 'sandboxPolicy'
+    ? { resolve: () => { throw new Error('policy service unavailable') } }
+    : undefined
+  let stamped = 'unset'
+  harness.fs.writeText = async (target, content, expected, signal, sandboxPolicy) => {
+    stamped = sandboxPolicy
+    return { operation: 'create', version: 'v1', before: null, after: content }
+  }
+
+  const result = await tool.execute({ write: true, models: LANE_MODELS }, {})
+  assert.equal(result.wrote, true, 'a throwing resolver must not block the write')
+  assert.equal(stamped, undefined, 'a failed resolution degrades to the backend default')
+  assert.ok(harness.logs.warn.some(line => /sandbox/i.test(line)), harness.logs.warn.join(' | '))
+})
+
 test('host_init_sandbox_denial_returns_text', async () => {
   const { harness, tool } = await bootstrapHarness()
   harness.fs.writeText = async () => { throw fsError('FS_SANDBOX_DENIED') }
