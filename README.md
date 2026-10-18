@@ -5,7 +5,7 @@
 > (see the "New-project bootstrap" subsection in §5). Installation, per-agent registration of the section and the tool,
 > the section actually reaching the prompt, live refresh on file edits, live reload of the Config, and
 > "not declared → not enabled" were all verified in a real session
-> (evidence in [doc/development.md](doc/development.md) §M4).
+> (evidence in [docs/development.md](docs/development.md) §M4).
 
 **racing = multiple models run the same sector at once, each in its own lane, with a CR as the judge who sends
 its notes back to the lanes until they pass.**
@@ -23,7 +23,7 @@ file, the plugin **stays silent** for that project (no prompt section, no `flow_
 plugin_manager  install_bundle  /home/liumenghan/dsh-racing-code
 
 # 2) give the project a flow; this repository's own file is a good starting point
-mkdir -p doc && cp /home/liumenghan/dsh-racing-code/main/doc/racing-code.md doc/racing-code.md
+mkdir -p docs && cp /home/liumenghan/dsh-racing-code/main/docs/racing-code.md docs/racing-code.md
 #    or just tell the orchestrator: start racing-code for this project (template -> confirm flow -> pick models)
 
 # 3) ask what is in force (read-only, re-read from disk):
@@ -35,12 +35,12 @@ diagram mentions must be added to the allowlist **by hand** in
 `Settings → Plugins → Subagent delegation`; the plugin tells you which one is missing.
 
 ```text
-<your project>/doc/racing-code.md      ← the only source: stages, order, lanes, branches, review rounds, models
+<your project>/docs/racing-code.md      ← the only source: stages, order, lanes, branches, review rounds, models
 (no file = no flow; the plugin injects nothing, only the racing_code_init bootstrap tool remains)
 ```
 
-Grammar and semantics: [doc/workflow-format.md](doc/workflow-format.md). Rationale:
-[doc/architecture.md](doc/architecture.md). Chinese version: [README.zh.md](README.zh.md).
+Grammar and semantics: [docs/workflow-format.md](docs/workflow-format.md). Rationale:
+[docs/architecture.md](docs/architecture.md). Chinese version: [README.zh.md](README.zh.md).
 
 ---
 
@@ -81,11 +81,11 @@ missing and where to add it — but **the GUI no longer merges it for you** (see
 
 | Situation | Plugin behaviour |
 |---|---|
-| The project has **no** `doc/racing-code.md` | **Silent**: no prompt section, no `flow_stages`; the `racing_code_init` bootstrap tool appears only when you explicitly say "start racing-code" (`bootstrapEnabled: false` turns even that off, see §5) |
+| The project has **no** `docs/racing-code.md` | **Silent**: no prompt section, no `flow_stages`; the `racing_code_init` bootstrap tool appears only when you explicitly say "start racing-code" (`bootstrapEnabled: false` turns even that off, see §5) |
 | The file exists and the diagram parses | **Enabled**: inject the flow section and register `flow_stages` |
 | The file exists but the diagram is broken | **No flow injected** — only **one diagnostic line**; `flow_stages` returns the full diagnostics, and `racing_code_init` is registered too (preview only by default; `force` replaces the broken file) |
 
-- The path defaults to `doc/racing-code.md` and is configurable via `projectFlowPath`;
+- The path defaults to `docs/racing-code.md` and is configurable via `projectFlowPath`;
 - **models live in the same file**: the second line of a stage's node label
   (`"Implement A<br/>opencode-go · deepseek-v4.1-flash"`) or the front matter's `models:` — equivalent, label wins.
   So "how this project works" is **one file, one commit, one review**;
@@ -135,7 +135,7 @@ flowchart TD
 Implement against the contract, drive the tests to green. Output: diff + test output.
 ````
 
-A node's **shape** decides its kind ([full grammar and semantics](doc/workflow-format.md)):
+A node's **shape** decides its kind ([full grammar and semantics](docs/workflow-format.md)):
 
 | Shape | Kind | Who runs it |
 |---|---|---|
@@ -162,7 +162,7 @@ A node's **shape** decides its kind ([full grammar and semantics](doc/workflow-f
 ## 5. A starting flow (example) and this repository's own flow
 
 The "two lanes + CR review rounds" flow below is the smallest useful shape; this repository uses it too
-([doc/racing-code.md](doc/racing-code.md), plus a "design signed off" user gate):
+([docs/racing-code.md](docs/racing-code.md), plus a "plan signed off" user gate):
 
 | Stage | What it does | Example route |
 |---|---|---|
@@ -179,7 +179,7 @@ The "two lanes + CR review rounds" flow below is the smallest useful shape; this
 ⁽¹⁾ This cell used `glm-5.3-flash` temporarily: in the 2026-10-17 measurement `mimo-v2.6-flash` answered
 `[model_coming_soon]` to every **streamed** request, and DSH only streams. **Re-tested 2026-10-18: streamed 200**,
 so the example is back to `mimo-v2.6-flash`; both measurements are in
-[doc/compatibility.md](doc/compatibility.md) §2.1.
+[docs/compatibility.md](docs/compatibility.md) §2.1.
 
 Typical edits: add a third lane (one more out-edge plus one more stage; `maxLanes` allows 4 by default); point the
 CR at a stronger model; tighten or loosen the review loop; add a release gate. **To change models, edit labels or
@@ -207,12 +207,12 @@ through **two user interventions**:
 declaration (`session`/missing key) it runs directly in the current session. **Lanes always delegate** (a lane
 picking `session` means the child inherits the session model); `commit` delegates because the configuration
 declares a model for it.
-**The `session` sentinel**: writing `design: session` in the models table means the user **has picked** "declare
+**The `session` sentinel**: writing `plan: session` in the models table means the user **has picked** "declare
 no model" (`routeSource: 'session'`) — an undeclared non-lane stage runs directly in the current session, an
 undeclared lane delegates on the session model — and it does **not** report `FLOW_ROUTE_MISSING`; only a
 **missing key** does. Write safety: the target is pinned to `projectFlowPath`, writes outside the root are
 refused, unverifiable text never lands (zero-error self-check), preview is the default, and overwriting always
-takes an explicit `force`. Details: [doc/bootstrap.md](doc/bootstrap.md).
+takes an explicit `force`. Details: [docs/bootstrap.md](docs/bootstrap.md).
 
 ## 6. Configuration
 
@@ -223,7 +223,7 @@ fields are edited in the profile patch's `racing-code` row `config` (defaults sh
 |---|---|---|---|
 | `enabled` | boolean | `true` | master switch (turn everything off temporarily) |
 | `bootstrapEnabled` | boolean | `true` | master switch for the new-project bootstrap: `false` keeps even the "no file" case **fully silent** (no `racing_code_init`) |
-| `projectFlowPath` | string | `doc/racing-code.md` | the only source, relative to the project root |
+| `projectFlowPath` | string | `docs/racing-code.md` | the only source, relative to the project root |
 | `maxStageRepeats` | number | `3` | default back-edge guard (overridable in front matter) |
 | `maxLanes` | number | `4` | max lanes per parallel group (overridable in front matter) |
 | `maxReviewRounds` | number | `2` | max "CR feedback → lane revision" rounds (overridable in front matter) |
@@ -242,7 +242,7 @@ longer writes it for you.
 
 ## 8. Runtime behaviour
 
-1. When a session's agent is created, the host half reads `<project root>/doc/racing-code.md` using
+1. When a session's agent is created, the host half reads `<project root>/docs/racing-code.md` using
    `agent.session.header.cwd`: missing → **stay silent** (only the `racing_code_init` bootstrap tool, see §5);
    present → parse the diagram, merge routes (label >
    front matter > current session model), check the allowlist and CR-model reuse, and cache the result
@@ -281,7 +281,7 @@ plugin_manager  install_bundle  /home/liumenghan/dsh-racing-code
 for this project" and walk the bootstrap, see §5). To try it:
 
 ```bash
-mkdir -p doc && cp <this repo>/doc/racing-code.md doc/racing-code.md    # or write your own
+mkdir -p docs && cp <this repo>/docs/racing-code.md docs/racing-code.md    # or write your own
 ```
 
 Prerequisites are already in `~/.dsh/profiles/web/cordis.patch.yml` and verified with
@@ -308,7 +308,7 @@ tree but a container holding the bare repository plus one directory per branch.
     ├── lib/bootstrap.js  # bootstrap pure layer: full/minimal templates, node choices, pre-flight plan, protocol
     ├── lib/sources.js    # source layer: read, enablement (disabled/missing/unreadable/invalid/ok), watch
     ├── test/             # node --test: flow / sources / bootstrap / host / package (96 cases)
-    └── doc/{racing-code.md, bootstrap.md, workflow-format.md, architecture.md, compatibility.md, development.md}
+    └── docs/{racing-code.md, bootstrap.md, workflow-format.md, architecture.md, compatibility.md, development.md}
 ```
 
 There is no client half: no `dsh.client`, no bundle, no settings page (§7).
@@ -318,14 +318,14 @@ Two consequences of that layout:
 1. **Working-tree commands run inside `main/`** (`git -C main status`, `npm test` with absolute paths under
    `main/`). The container root is for repository-wide operations only (`git worktree list`, `git fetch`,
    `git branch`); it has no work tree, so `git status` there reports `must be run in a work tree` — expected.
-2. **The flow file is the tracked `main/doc/racing-code.md`**, while a session's cwd is the container root, so the
+2. **The flow file is the tracked `main/docs/racing-code.md`**, while a session's cwd is the container root, so the
    plugin needs to be pointed at it:
 
    ```yaml
    # ~/.dsh/profiles/web/cordis.patch.yml
    - id: racing-code
      config:
-       projectFlowPath: main/doc/racing-code.md
+       projectFlowPath: main/docs/racing-code.md
    ```
 
    Lane directories follow the same rule: this repository's flow sets `laneDir: branch`, so the two lanes land in
@@ -341,11 +341,11 @@ Two consequences of that layout:
 
 | Document | Audience |
 |---|---|
-| [doc/workflow-format.md](doc/workflow-format.md) | Flow authors: mermaid subset, lanes and joins, user gates, in-diagram model labels, diagnostics, execution semantics |
-| [doc/racing-code.md](doc/racing-code.md) | This repository's own flow (example and starting point) |
-| [doc/architecture.md](doc/architecture.md) | Maintainers: rationale, the host half, lanes and CR, failure modes, decision log |
-| [doc/compatibility.md](doc/compatibility.md) | Maintainers: the official contracts relied on, how each was verified, failure symptoms |
-| [doc/development.md](doc/development.md) | Implementers and maintainers: milestones, interface contracts, acceptance criteria, **evidence from a real session**, risks |
+| [docs/workflow-format.md](docs/workflow-format.md) | Flow authors: mermaid subset, lanes and joins, user gates, in-diagram model labels, diagnostics, execution semantics |
+| [docs/racing-code.md](docs/racing-code.md) | This repository's own flow (example and starting point) |
+| [docs/architecture.md](docs/architecture.md) | Maintainers: rationale, the host half, lanes and CR, failure modes, decision log |
+| [docs/compatibility.md](docs/compatibility.md) | Maintainers: the official contracts relied on, how each was verified, failure symptoms |
+| [docs/development.md](docs/development.md) | Implementers and maintainers: milestones, interface contracts, acceptance criteria, **evidence from a real session**, risks |
 
 ## 12. Open questions
 

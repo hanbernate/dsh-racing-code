@@ -1,5 +1,5 @@
 // Contract tests for the pure bootstrap layer (lib/bootstrap.js).
-// Written against the interface in doc/bootstrap.md §3.2 and §4 — they must not be
+// Written against the interface in docs/bootstrap.md §3.2 and §4 — they must not be
 // adjusted to fit an implementation: the generator's red line is "the text resolves with
 // zero errors", and no route is ever picked for the user.
 import { test } from 'node:test'
@@ -22,7 +22,7 @@ const CATALOG = [
   { provider: 'other-vendor', model: 'x-large' },
 ]
 const STAGES = [
-  { id: 'design', label: '设计', brief: '产出设计文档，不写代码' },
+  { id: 'plan', label: '设计', brief: '产出设计文档，不写代码' },
   { id: 'contract-tests', label: '接口 + 测试' },
   { id: 'implement-a', label: '实现 A' },
   { id: 'implement-b', label: '实现 B' },
@@ -38,7 +38,7 @@ const byId = (resolved, id) => resolved.stages.find(stage => stage.id === id)
 /** Facts for buildPlan: a ready-to-bootstrap worktree container unless overridden. */
 function facts(overrides = {}) {
   return {
-    file: '/projects/demo/doc/racing-code.md',
+    file: '/projects/demo/docs/racing-code.md',
     fileExists: false,
     parentExists: true,
     gitLayout: 'worktree-container',
@@ -72,10 +72,10 @@ test('bootstrap_full_template_resolves_with_zero_errors', () => {
   const resolved = resolveFlow(text, { allowedModels: ALLOWED })
   assert.deepEqual(resolved.problems, [], 'a generated file must resolve without a single problem')
   assert.equal(resolved.ok, true)
-  assert.equal(resolved.entry, 'design')
+  assert.equal(resolved.entry, 'plan')
   assert.deepEqual(resolved.joins, [{ at: 'cr', lanes: ['implement-a', 'implement-b'] }])
   assert.deepEqual(resolved.stages.map(stage => stage.id),
-    ['design', 'contract-tests', 'implement-a', 'implement-b', 'cr', 'commit'])
+    ['plan', 'contract-tests', 'implement-a', 'implement-b', 'cr', 'commit'])
 
   for (const stage of resolved.stages) {
     assert.equal(stage.route, null, `${stage.id} is not routed yet`)
@@ -102,7 +102,7 @@ test('bootstrap_minimal_template_valid', () => {
 })
 
 test('bootstrap_entry_and_labeled_back_edges', () => {
-  for (const [preset, entry] of [['full', 'design'], ['minimal', 'plan']]) {
+  for (const [preset, entry] of [['full', 'plan'], ['minimal', 'plan']]) {
     const text = renderBootstrapTemplate({ template: preset, lanes: 2 })
     assert.ok(text.includes(`%% entry: ${entry}`), `${preset} declares its entry`)
 
@@ -120,7 +120,7 @@ test('bootstrap_entry_and_labeled_back_edges', () => {
 
   const full = resolveFlow(renderBootstrapTemplate({ template: 'full', lanes: 2 }), {})
   assert.deepEqual(full.loops.map(loop => `${loop.kind} ${loop.via}->${loop.backTo}`).sort(),
-    ['review confirm->race', 'stage confirm->design', 'stage final->design', 'stage gate->design'])
+    ['review confirm->race', 'stage confirm->plan', 'stage final->plan', 'stage gate->plan'])
 })
 
 test('bootstrap_full_template_carries_the_confirm_user_gate', () => {
@@ -128,9 +128,9 @@ test('bootstrap_full_template_carries_the_confirm_user_gate', () => {
   assert.deepEqual(codes(resolved, 'error'), [])
 
   const confirm = resolved.nodes.find(item => item.id === 'confirm')
-  assert.ok(confirm, 'the full preset has the confirm user gate (parity with doc/racing-code.md)')
+  assert.ok(confirm, 'the full preset has the confirm user gate (parity with docs/racing-code.md)')
   assert.equal(confirm.kind, 'user_gate')
-  assert.deepEqual(confirm.next.map(edge => edge.to).sort(), ['commit', 'design', 'race'])
+  assert.deepEqual(confirm.next.map(edge => edge.to).sort(), ['commit', 'plan', 'race'])
   assert.deepEqual(confirm.next.map(edge => edge.when).sort(), ['先完善约束', '发回修订', '接受现状'])
 
   const verdict = resolved.nodes.find(item => item.id === 'verdict')
@@ -252,22 +252,22 @@ test('bootstrap_plan_no_git_is_blocked', () => {
 // ─────────────────────────────── the write target ───────────────────────────────
 
 test('bootstrap_target_outside_root_rejected', () => {
-  assert.deepEqual(checkBootstrapTarget({ cwd: '/projects/demo', projectFlowPath: 'doc/racing-code.md' }),
-    { ok: true, file: '/projects/demo/doc/racing-code.md' })
+  assert.deepEqual(checkBootstrapTarget({ cwd: '/projects/demo', projectFlowPath: 'docs/racing-code.md' }),
+    { ok: true, file: '/projects/demo/docs/racing-code.md' })
   assert.equal(checkBootstrapTarget({ cwd: '/projects/demo', projectFlowPath: '' }).file,
-    '/projects/demo/doc/racing-code.md', 'an empty path means the default')
+    '/projects/demo/docs/racing-code.md', 'an empty path means the default')
 
-  const inside = checkBootstrapTarget({ cwd: '/projects/demo', projectFlowPath: '/projects/demo/doc/flow.md' })
+  const inside = checkBootstrapTarget({ cwd: '/projects/demo', projectFlowPath: '/projects/demo/docs/flow.md' })
   assert.equal(inside.ok, true)
-  assert.equal(inside.file, '/projects/demo/doc/flow.md')
+  assert.equal(inside.file, '/projects/demo/docs/flow.md')
 
-  for (const escaped of ['../outside.md', 'doc/../../evil.md', '/etc/racing-code.md']) {
+  for (const escaped of ['../outside.md', 'docs/../../evil.md', '/etc/racing-code.md']) {
     const result = checkBootstrapTarget({ cwd: '/projects/demo', projectFlowPath: escaped })
     assert.equal(result.ok, false, `${escaped} must be rejected`)
     assert.equal(result.code, 'BOOTSTRAP_TARGET_OUTSIDE_ROOT')
     assert.ok(typeof result.message === 'string' && result.message.length > 0)
   }
-  assert.equal(checkBootstrapTarget({ cwd: '', projectFlowPath: 'doc/racing-code.md' }).ok, false,
+  assert.equal(checkBootstrapTarget({ cwd: '', projectFlowPath: 'docs/racing-code.md' }).ok, false,
     'a cwd that cannot anchor containment is rejected')
 })
 
@@ -286,9 +286,9 @@ test('bootstrap_zero_error_guard_blocks_bad_spec', () => {
 // ─────────────────────────────── the two-gate protocol ───────────────────────────────
 
 test('bootstrap_protocol_has_two_gates', () => {
-  const file = '/projects/demo/doc/racing-code.md'
+  const file = '/projects/demo/docs/racing-code.md'
   const protocol = bootstrapProtocol({ file, lanes: 3 })
-  assert.ok(Array.isArray(protocol) && protocol.length >= 9, 'the nine steps of doc/bootstrap.md §2')
+  assert.ok(Array.isArray(protocol) && protocol.length >= 9, 'the nine steps of docs/bootstrap.md §2')
   assert.ok(protocol.every(step => typeof step === 'string' && step.trim().length > 0))
 
   const text = protocol.join('\n')
@@ -315,8 +315,8 @@ test('bootstrap_protocol_has_two_gates', () => {
 test('template_briefs_state_the_route_split_and_the_gate_protocol', () => {
   const text = renderBootstrapTemplate({ template: 'full', lanes: 2 })
   const brief = id => text.split('### ' + id)[1].split('### ')[0]
-  assert.match(brief('design'), /声明/)
-  assert.match(brief('design'), /在当前会话直接执行/)
+  assert.match(brief('plan'), /声明/)
+  assert.match(brief('plan'), /在当前会话直接执行/)
   assert.match(brief('contract-tests'), /在当前会话直接执行/)
   assert.match(brief('cr'), /建议/)
   assert.match(brief('cr'), /完整材料/)

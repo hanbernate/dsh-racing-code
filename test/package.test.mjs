@@ -23,7 +23,7 @@ test('the shipped patch inserts one row with the documented defaults and no glob
   for (const line of [
     'enabled: true',
     'bootstrapEnabled: true',
-    'projectFlowPath: doc/racing-code.md',
+    'projectFlowPath: docs/racing-code.md',
     'maxStageRepeats: 3',
     'maxLanes: 4',
     'maxReviewRounds: 2',

@@ -5,7 +5,7 @@ maxLanes: 3
 maxReviewRounds: 2
 laneDir: branch                # 车道目录 = 分支名 → /home/liumenghan/dsh-racing-code/racing/<lane-id>
 models:
-  design: session                 # 显式"用当前会话模型"→ 在当前会话直接执行
+  plan: session                 # 显式"用当前会话模型"→ 在当前会话直接执行
   contract-tests: session
   cr: session
   implement-a: opencode-go/deepseek-v4.1-flash
@@ -25,14 +25,14 @@ models:
 
 **判定与用户关口语义相同**：执行方先给**建议与依据**，再用 `ask_user_question` 让**用户**下判断（选项=出边文字）；提问前先把**完整材料**发出来（问题清单逐条、diff 摘要、建议），等待给足（≥10 分钟）。
 
-**纯文档改动不走赛道**：定稿后由 `要改代码吗?` 判定——只改文档（README / `doc/*.md`）就直接收口提交，
+**纯文档改动不走赛道**：定稿后由 `要改代码吗?` 判定——只改文档（README / `docs/*.md`）就直接收口提交，
 不写契约测试、不开赛道（那两样对文档没有可比性）。
 
 ```mermaid
 flowchart TD
-  %% entry: design
-  design["设计"] --> final(["用户定稿?"])
-  final -- "否" --> design
+  %% entry: plan
+  plan["规划"] --> final(["用户定稿?"])
+  final -- "否" --> plan
   final -- "是" --> needs-code{"要改代码吗?"}
   needs-code -- "否：纯文档改动" --> commit["提交"]
   needs-code -- "是" --> contract-tests["接口 + 测试"]
@@ -44,11 +44,11 @@ flowchart TD
   cr --> common{"存在共同问题?"}
   common -- "有" --> gate(["用户决定：完善约束还是接受现状"])
   common -- "无" --> verdict{"每条赛道都通过?"}
-  gate -- "完善约束" --> design
+  gate -- "完善约束" --> plan
   gate -- "接受现状" --> verdict
   verdict -- "否：按反馈修订" --> confirm(["用户确认：把 CR 意见发回赛道?"])
   confirm -- "发回修订" --> race
-  confirm -- "先完善约束" --> design
+  confirm -- "先完善约束" --> plan
   confirm -- "接受现状" --> commit
   verdict -- "是" --> commit
 ```
@@ -59,13 +59,13 @@ flowchart TD
 
 ## 阶段说明
 
-### design
+### plan
 
 **在当前会话直接执行**（路由 session，不委派子代理）。
 
 产出**设计文档**，不写代码：
 
-- 改 `README.zh.md` / `README.md` / `doc/*.md`，必要时新增文档；
+- 改 `README.zh.md` / `README.md` / `docs/*.md`，必要时新增文档；
 - 每个设计决策都要写清"为什么这样选、代价是什么、失效时什么症状"；
 - 决策点若有两个以上合理选项，先问用户，不要替用户拍板；
 - 产出：diff + 一段"改了什么、还留了哪些未决问题"的汇报。
@@ -86,7 +86,7 @@ flowchart TD
 - 断言**行为与产出**，不断言私有实现（不 mock 内部私有方法，不断言内部集合类型与调用次数——除非并发/资源语义本身就是契约）；
 - 跑一次 `npm test`，确认**红**，并把红的输出贴进汇报；红的**判据**：失败原因必须与"还没实现"一致
   （骨架抛 `not implemented`，或断言失败）——**一写就是绿的用例说明它没在测任何东西**，先修用例，不要往下走；
-- 测试定稿后**赛道不得修改**；契约本身有问题就停下来说明，回到 `design`。
+- 测试定稿后**赛道不得修改**；契约本身有问题就停下来说明，回到 `plan`。
 
 ### implement-a / implement-b
 
@@ -111,14 +111,14 @@ flowchart TD
 
 1. 对每条 lane：`git -C <worktree> diff`（第 2 轮起只看本轮新增）、读 `lib/` 与 `test/`、
    **在该 worktree 里**跑 `npm test`；
-2. 按类归并问题：契约/测试缺口、实现缺陷、约束违背（与 `doc/workflow-format.md` 不一致）、风格；
+2. 按类归并问题：契约/测试缺口、实现缺陷、约束违背（与 `docs/workflow-format.md` 不一致）、风格；
 3. 求**共同问题**：两条赛道都出现的同一类问题；
 4. 每条共同问题追一层：**哪条约束没说清**，建议补到哪个文件
-   （`doc/workflow-format.md`、`doc/architecture.md`、`AGENTS.md`、或补一条测试）；
+   （`docs/workflow-format.md`、`docs/architecture.md`、`AGENTS.md`、或补一条测试）；
 5. 有共同问题 → 用 `ask_user_question` 原样反馈，请用户在图上 `gate` 的两个选项里选；
    选"接受现状"记入已接受清单，后续轮次不再当阻塞问题；
 6. **把任何意见发回赛道之前，必须走图上 `confirm` 用户关口**（`ask_user_question`，选项就是它的
-   三条出边）："发回修订"才继续第 7 步；"先完善约束" → 回 `design`；"接受现状" → 直接进 `commit`。
+   三条出边）："发回修订"才继续第 7 步；"先完善约束" → 回 `plan`；"接受现状" → 直接进 `commit`。
    **不得未经用户确认就 `send_message` 发回赛道**；
 7. **单赛道问题** → 用户确认后按赛道切分，`send_message` 发回该赛道原来的子代理，让它在原 worktree、
    原分支上修订并提交（不要告诉它另一条赛道的问题，也不要给评分对比）；
@@ -137,7 +137,7 @@ flowchart TD
 - 有赛道时：提交**胜者**那条赛道（`git -C <worktree> …`），落选赛道**不删分支**；
 - 有赛道时：看一遍 `git diff`，核对是否严格按"契约测试 → 实现"的顺序发生；
 - 收口前跑一遍验证命令（`npm test`、文档链接与诊断码交叉检查等），结果写进汇报；
-- 文档若与实现漂移，回到 `design` 阶段补文档（不要在这里偷偷改）；
+- 文档若与实现漂移，回到 `plan` 阶段补文档（不要在这里偷偷改）；
 - 写 commit message：一句话说清"做了什么"，正文列出验证方式与胜者（有赛道时）；
 - 有赛道时：提交后清理落选赛道的 worktree 目录（`git worktree remove`，分支保留）；
 - 把结果汇报给用户：改了什么、验证结果、胜者与已接受清单（有赛道时）、以及**仓库当前还不是 git 仓库**时

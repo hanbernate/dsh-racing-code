@@ -65,12 +65,12 @@ const GOOD = [
 ].join('\n')
 
 const CWD = '/projects/demo'
-const FILE = '/projects/demo/doc/racing-code.md'
-const CONFIG = { enabled: true, projectFlowPath: 'doc/racing-code.md' }
+const FILE = '/projects/demo/docs/racing-code.md'
+const CONFIG = { enabled: true, projectFlowPath: 'docs/racing-code.md' }
 
 test('flowFilePath: relative resolves against the project root, absolute is kept', () => {
-  assert.equal(flowFilePath(CWD, 'doc/racing-code.md'), FILE)
-  assert.equal(flowFilePath('/projects/demo/', 'doc/racing-code.md'), FILE)
+  assert.equal(flowFilePath(CWD, 'docs/racing-code.md'), FILE)
+  assert.equal(flowFilePath('/projects/demo/', 'docs/racing-code.md'), FILE)
   assert.equal(flowFilePath(CWD, '/elsewhere/flow.md'), '/elsewhere/flow.md')
 })
 
@@ -80,7 +80,7 @@ test('STATUSES lists every outcome loadFlow can report', () => {
 
 test('readProjectFlow: a missing file is normal, not an error', async () => {
   const fs = fakeFs()
-  const source = await readProjectFlow(fs, CWD, 'doc/racing-code.md')
+  const source = await readProjectFlow(fs, CWD, 'docs/racing-code.md')
   assert.equal(source.status, 'missing')
   assert.equal(source.file, FILE)
   assert.equal(source.text, undefined)
@@ -89,12 +89,12 @@ test('readProjectFlow: a missing file is normal, not an error', async () => {
 
 test('readProjectFlow: exists but not UTF-8 text → unreadable, and an unexpected error never escapes', async () => {
   const binary = fakeFs({ files: { [FILE]: fsError('FS_NOT_TEXT') } })
-  const source = await readProjectFlow(binary, CWD, 'doc/racing-code.md')
+  const source = await readProjectFlow(binary, CWD, 'docs/racing-code.md')
   assert.equal(source.status, 'unreadable')
   assert.deepEqual(source.problems.map(p => [p.code, p.level]), [['FLOW_FILE_UNREADABLE', 'error']])
 
   const broken = fakeFs({ files: { [FILE]: new Error('boom') } })
-  const also = await readProjectFlow(broken, CWD, 'doc/racing-code.md')
+  const also = await readProjectFlow(broken, CWD, 'docs/racing-code.md')
   assert.equal(also.status, 'unreadable')
   assert.match(also.problems[0].message, /boom/)
 })
@@ -218,7 +218,7 @@ test('smoke: the repository flow file loads through the real filesystem', async 
   })
   assert.equal(source.status, 'ok')
   assert.equal(source.enabled, true)
-  assert.equal(source.resolved.entry, 'design')
+  assert.equal(source.resolved.entry, 'plan')
   assert.deepEqual(source.resolved.joins, [{ at: 'cr', lanes: ['implement-a', 'implement-b'] }])
   assert.deepEqual(source.problems, [])
 })

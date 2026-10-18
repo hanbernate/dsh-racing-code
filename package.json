@@ -1,7 +1,7 @@
 {
   "name": "dsh-racing-code",
   "version": "0.2.0",
-  "description": "Per-project development flows for DSH: a project's doc/racing-code.md declares stages, parallel lanes and per-stage models as a mermaid diagram; the host half injects it and lets the main session race several models, review them, and feed the review back until they pass.",
+  "description": "Per-project development flows for DSH: a project's docs/racing-code.md declares stages, parallel lanes and per-stage models as a mermaid diagram; the host half injects it and lets the main session race several models, review them, and feed the review back until they pass.",
   "keywords": [
     "dsh",
     "dsh-plugin",
@@ -28,7 +28,7 @@
   "files": [
     "lib",
     "locale",
-    "doc",
+    "docs",
     "cordis.patch.yml",
     "README.md",
     "README.zh.md"

@@ -13,7 +13,7 @@ v0.1.0（M0–M5）与 v0.2.0（M6–M8）均已实现；M9–M11 是 v0.2.0 之
 
 | | |
 |---|---|
-| **要做** | 读项目里的 `doc/racing-code.md` → 解析 mermaid 图与模型表 → 给该项目 root agent 注入系统提示段落 + 注册 `flow_stages` 工具；项目没声明就**什么都不做** |
+| **要做** | 读项目里的 `docs/racing-code.md` → 解析 mermaid 图与模型表 → 给该项目 root agent 注入系统提示段落 + 注册 `flow_stages` 工具；项目没声明就**什么都不做** |
 | **不做** | 不做 GUI、不做全局/内置流程、不委派、不建 worktree、不跑判定、不数轮次、不写工作区（v0.2 起唯一例外：用户两次确认后由 `racing_code_init` 写 `projectFlowPath` 这一个文件） |
 | **可以晚做** | `run_flow` 确定性执行器（v2）；"打印流程模板"的小工具已落地为 `racing_code_init`（v0.2.0） |
 
@@ -55,7 +55,7 @@ dsh-racing-code/
    换 worktree 改代码后要重新安装指向新目录，并**重启 dsh** 加载新的 JS 模块代
    （本次得到 `application: restart-required`，重启后生效）。
 3. **流程文件指路**：会话 cwd 是容器根，所以 profile 补丁里该行配
-   `projectFlowPath: main/doc/racing-code.md`（被跟踪的那一份）。
+   `projectFlowPath: main/docs/racing-code.md`（被跟踪的那一份）。
 
 ## 2. 里程碑总览
 
@@ -100,7 +100,7 @@ cordis.patch.yml      - insert:
                             name: 'dsh-racing-code'
                             config:
                               enabled: true
-                              projectFlowPath: doc/racing-code.md
+                              projectFlowPath: docs/racing-code.md
                               maxStageRepeats: 3
                               maxLanes: 4
                               maxReviewRounds: 2
@@ -164,7 +164,7 @@ lib/  test/           空目录，等 M1 起
 - **模型表**：图内标注优先、front-matter 兜底、两处都没有 → `fallback`；标签第二行写中文 → **不**被当路由；
   标签上写着模型但实际生效另一个 → `FLOW_LABEL_ROUTE_SHADOWED`；白名单命中/未命中/白名单不可读；
 - **每个 error 级诊断码各一个反例**（见规范 §9 的表，逐个对照，不许漏）；
-- **真实文件当夹具**：`doc/racing-code.md` 必须解析成功（把它当"规范与实现不漂移"的守门测试）。
+- **真实文件当夹具**：`docs/racing-code.md` 必须解析成功（把它当"规范与实现不漂移"的守门测试）。
 
 ## M2. 取源与启用判定 `lib/sources.js`（小）
 
@@ -215,8 +215,8 @@ lib/  test/           空目录，等 M1 起
 
 - `Config.listConfigs { entry: "racing-code" }` 的 schema 是五个字段；`Tool.listTools` 在**没有流程文件**的
   会话里**没有** `flow_stages`，在**有流程文件**的会话里有；
-- 本项目（有 `doc/racing-code.md`）新开会话 → 段落里出现**项目**那张图（含 `用户定稿?` 关口、两条赛道、
-  汇合点 `cr`），`flow_stages` 返回 `entry: design`、`joins[0].at: cr`、`loops[]` 两条；
+- 本项目（有 `docs/racing-code.md`）新开会话 → 段落里出现**项目**那张图（含 `用户定稿?` 关口、两条赛道、
+  汇合点 `cr`），`flow_stages` 返回 `entry: plan`、`joins[0].at: cr`、`loops[]` 两条；
 - 把文件改名 → 当前会话段落变成一句 `FLOW_FILE_MISSING_AFTER_ENABLE`，工具返回 `notEnabled`；
   新开会话 → 段落与工具**都不存在**；
 - 把文件改坏（删一个箭头）→ 段落变成一句诊断、工具返回 `reason: 'invalid'` 带候选/错误码；会话照常发请求；
@@ -232,10 +232,10 @@ lib/  test/           空目录，等 M1 起
 | `install_bundle /home/liumenghan/dsh-racing-code` | ✅ `application: applied`，`warnings: []`，`enabled: true`，进入 profile 的 `dsh.profile.bundles` |
 | `Config.listConfigs { name }` | ✅ 查到 `patchId: racing-code`；`status: unsupported`（预期，见 §M0 验收） |
 | `Tool.listTools` | ✅ 出现 `flow_stages`（活跃会话的 `agents.list()` 安装路径生效） |
-| **段落真的进了系统提示** | ✅ 会话日志 `system/message` 里含 `项目流程：/home/liumenghan/dsh-racing-code/doc/racing-code.md` + 紧凑图 + 路由 + 规则行；安装**前**那一条没有它 |
+| **段落真的进了系统提示** | ✅ 会话日志 `system/message` 里含 `项目流程：/home/liumenghan/dsh-racing-code/docs/racing-code.md` + 紧凑图 + 路由 + 规则行；安装**前**那一条没有它 |
 | **文件变更热刷新** | ✅ 同一条日志里最新一条 system prompt 已经是我改图**之后**的版本（含 `needs-code{要改代码吗?}`）——`fs.watch` → 重算 → 下一步生效，全程真实会话 |
-| **`flow_stages` 真实读盘** | ✅ 在会话里直接调用：返回入口 `design`、6 个阶段、`[race: implement-a ∥ implement-b]`、3 条回边（评审轮最多 2 轮）、各阶段路由、`.worktrees/implement-a`（当时还是默认布局；现在本仓库用 `laneDir: branch`，赛道目录是 `racing/implement-a`）、全部阶段说明与渲染好的带模型 mermaid |
-| **配置热生效 + "没声明就不启用"活路径** | ✅ 临时把该行 `projectFlowPath` 指向 `doc/racing-code.md.disabled` → 下一步的 `system/message` **不再含流程段落**、`request/header` 里 **`flow_stages` 消失**；还原补丁 → 工具**重新出现在请求头**（全程未重启、未新开会话）。探针已删除，profile 补丁已还原 |
+| **`flow_stages` 真实读盘** | ✅ 在会话里直接调用：返回入口 `plan`、6 个阶段、`[race: implement-a ∥ implement-b]`、3 条回边（评审轮最多 2 轮）、各阶段路由、`.worktrees/implement-a`（当时还是默认布局；现在本仓库用 `laneDir: branch`，赛道目录是 `racing/implement-a`）、全部阶段说明与渲染好的带模型 mermaid |
+| **配置热生效 + "没声明就不启用"活路径** | ✅ 临时把该行 `projectFlowPath` 指向 `docs/racing-code.md.disabled` → 下一步的 `system/message` **不再含流程段落**、`request/header` 里 **`flow_stages` 消失**；还原补丁 → 工具**重新出现在请求头**（全程未重启、未新开会话）。探针已删除，profile 补丁已还原 |
 
 **仍未实测的两条**（诚实记录，等第一次真跑赛道时确认）：
 
@@ -250,11 +250,11 @@ lib/  test/           空目录，等 M1 起
   系统提示里也没有流程段落（**活路径已按上表第 3 行验过**；单元测试覆盖同一路径：
   `test/host.test.mjs` 的 "a project without a flow file registers nothing at all"）。
 
-**然后把插件当成真的编排者用一遍**（本仓库自己的流程：[doc/racing-code.md](racing-code.md)）：
+**然后把插件当成真的编排者用一遍**（本仓库自己的流程：[docs/racing-code.md](racing-code.md)）：
 
 在**本仓库**（两条赛道 + 设计定稿关口）跑一遍真实小任务，逐条勾：
 
-1. **入口与段落**：段落首行是文件路径；图与 `doc/racing-code.md` 一致；`flow_stages` 的路由与图上标签一致；
+1. **入口与段落**：段落首行是文件路径；图与 `docs/racing-code.md` 一致；`flow_stages` 的路由与图上标签一致；
 2. **用户关口**：走到"用户定稿?"时它是**问你**（`ask_user_question`，选项就是那两条边的文字），
    不自己拍板；
 3. **并行赛道**：两条 lane 在**同一条消息**里发起、都以后台方式运行；`git worktree list` 看得到
@@ -265,7 +265,7 @@ lib/  test/           空目录，等 M1 起
    只有 A 被重跑（B 的 HEAD 与工作区没变）；修订在**同一 worktree/分支**完成并提交（`round 2:`）；
    CR 复评只看 A 的本轮新增 diff；**两条都通过的那一轮才出现胜者**；
 5. **共同问题闭环**：构造"两条都错同一处"（例如契约没写清某个边界输入）→ CR 走**用户关口**问你是否完善约束；
-   选"接受现状" → 该问题进已接受清单、下一轮不再当阻塞项；选"完善约束" → 回到 `design`；
+   选"接受现状" → 该问题进已接受清单、下一轮不再当阻塞项；选"完善约束" → 回到 `plan`；
 6. **兜底与降级**：把 `maxReviewRounds` 临时设为 1 并构造"改完还是不通过" → 编排者**停下问用户**，
    不自己开第三轮；`send_message` 打到一个已结束的 `subagentId` → 退化为同模型新起一个并在汇报里说明；
 7. **跨轮一致性**：`flow_stages` 的 `lane.worktree` / `lane.branch` 与磁盘上实际建出来的一致；
@@ -285,7 +285,7 @@ lib/  test/           空目录，等 M1 起
   新增 `FLOW_ROUTE_MALFORMED` / `FLOW_BACK_EDGE_TARGET` 两个码、补"形状闭合后不能有多余文本"、
   [architecture.md](architecture.md) §4/§9 同步（无浏览器半、无 GUI 的理由）与 §7 紧凑图示例；
 - ⏳ 未做（需要用户先拍板）：仓库**还不是 git 仓库**，所以流程里的"提交"目前只能做到收口
-  （`doc/racing-code.md` 的 `### commit` 已写明这种情况怎么汇报）。
+  （`docs/racing-code.md` 的 `### commit` 已写明这种情况怎么汇报）。
   （后已解决：`0785b3a` 起仓库按 worktree 容器布局成为 git 仓库。）
 
 ---
@@ -342,7 +342,7 @@ lib/  test/           空目录，等 M1 起
 
 | 层 | 手段 | 说明 |
 |---|---|---|
-| 纯函数（解析/图校验/lane/回边/合并/渲染/诊断） | `node --test test/flow.test.mjs` | 无 DSH 依赖；**`doc/racing-code.md` 当夹具**防漂移 |
+| 纯函数（解析/图校验/lane/回边/合并/渲染/诊断） | `node --test test/flow.test.mjs` | 无 DSH 依赖；**`docs/racing-code.md` 当夹具**防漂移 |
 | 取源与启用判定 | 假 `fs` 对象 | 覆盖 `missing / unreadable / invalid / ok` 四条路径 |
 | 宿主半注册 | 假 ctx 组装测试（照 [dsh-save-button/test/client-harness.mjs](</home/liumenghan/dsh-download-button/test/client-harness.mjs>) 的做法） | 断言：没文件时**只注册 `racing_code_init`**（`bootstrapEnabled: false` 时零注册）；有文件时 section + tool 各注册一次、参数正确、disposer 干净 |
 | 守卫 | `test/package.test.mjs` | 禁止 `require` 官方实现包；断言 `package.json` **没有** `dsh.client` |
@@ -387,7 +387,7 @@ plugin_manager        list_bundles / list_plugins
 
 1. `run_flow` 确定性执行器要不要做（v2；可架在 `ctx.workflowEngine` 之上，照 `tool-ralph` 的先例）；
 2. 三个护栏要不要硬强制（要挂 `session/event` 数轮次，与"插件不参与请求路径"冲突）；
-3. 流程文件名固定 `doc/racing-code.md`，还是支持候选链（如再找 `.dsh/racing-code.md`）；
-4. CR 报告要不要提供"落盘到 `doc/cr/<日期>.md`"的选项；
+3. 流程文件名固定 `docs/racing-code.md`，还是支持候选链（如再找 `.dsh/racing-code.md`）；
+4. CR 报告要不要提供"落盘到 `docs/cr/<日期>.md`"的选项；
 5. 复盘轮要不要"逐赛道独立收敛"（通过的 lane 冻结）；
 6. CR 的评分标准/权重要不要让项目在流程文件里声明。

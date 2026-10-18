@@ -6,7 +6,7 @@
 
 面向两类读者：
 
-- **写流程的人**（每个项目自己的 `doc/racing-code.md`）：看 §2–§6、§10–§12；
+- **写流程的人**（每个项目自己的 `docs/racing-code.md`）：看 §2–§6、§10–§12；
 - **实现插件的人**：看 §4、§5、§7–§9（解析规则、模型表、诊断码、执行语义）。
 
 设计与依据见 [architecture.md](architecture.md)，依赖的官方契约见 [compatibility.md](compatibility.md)。
@@ -16,7 +16,7 @@
 ## 1. 唯一来源：项目里的这份文件
 
 **没有全局流程，也没有内置兜底。** 一个项目的流程只来自
-`<项目根>/<Config.projectFlowPath>`（默认 `doc/racing-code.md`），项目根 = `agent.session.header.cwd`
+`<项目根>/<Config.projectFlowPath>`（默认 `docs/racing-code.md`），项目根 = `agent.session.header.cwd`
 （会话创建时的绝对工作目录）。而**模型表也在这份文件里**——所以"这个项目怎么干活"是**一个文件、一次提交、
 一份 review** 的事，不需要在别处再维护一张表。
 
@@ -312,7 +312,7 @@ contract-tests ──► race ──┤                                    ├�
 ### 7.2 语义
 
 ```yaml
-# <项目>/doc/racing-code.md 的 front-matter
+# <项目>/docs/racing-code.md 的 front-matter
 plan: opencode-go/mimo-v2.6-pro                       # 简写：provider/model
 contract-tests: opencode-go/mimo-v2.6-flash
 implement-a: opencode-go/deepseek-v4.1-flash          # 赛道 1
@@ -328,7 +328,7 @@ commit: kilo/kilo-auto/free
   **并行组、判定、用户关口不需要路由**；
 - 出现图里没有的 id → 只警告 `FLOW_MODEL_UNKNOWN_STAGE`；
 - 阶段缺路由 → 非 lane **在当前会话直接执行**、lane **委派时用当前会话模型**，并在会话里明确提示（§1.2 第 3 条）；
-- **关键字 `session`**：显式写 `design: session` = 用户已选「不声明模型」（`routeSource: 'session'`）——非 lane 阶段在当前会话直接执行、lane 委派时用当前会话模型——**不报** `FLOW_ROUTE_MISSING`；只有**缺键**才报 missing（漏配 ≠ 显式选择）。
+- **关键字 `session`**：显式写 `plan: session` = 用户已选「不声明模型」（`routeSource: 'session'`）——非 lane 阶段在当前会话直接执行、lane 委派时用当前会话模型——**不报** `FLOW_ROUTE_MISSING`；只有**缺键**才报 missing（漏配 ≠ 显式选择）。
 - **CR 的模型不应与任何 lane 相同**（自评会有偏好）：命中就警告 `FLOW_CR_MODEL_REUSED`；
 - 路由是否在子代理**白名单**内由插件单独校验：不在 → 标 `未授权`，并在会话里告诉你**缺哪一条、加到哪里**
   （内置 Subagent 设置页）。多条 lane 意味着**白名单至少要有这么多条可用路由**——这条要在开跑前就看到；
@@ -510,7 +510,7 @@ CR 第 <N> 轮对你这条赛道的结论是"未通过"，只列你自己的问�
 
 ## 12. 完整示例
 
-**最小可用（两条赛道 + CR 评审轮）**——把这段放进 `<项目>/doc/racing-code.md` 就启用了：
+**最小可用（两条赛道 + CR 评审轮）**——把这段放进 `<项目>/docs/racing-code.md` 就启用了：
 
 ````markdown
 ---
@@ -565,9 +565,9 @@ models:
 
 ```mermaid
 flowchart TD
-  %% entry: design
-  design["设计"] --> final(["用户定稿?"])
-  final -- "否" --> design
+  %% entry: plan
+  plan["规划"] --> final(["用户定稿?"])
+  final -- "否" --> plan
   final -- "是" --> contract-tests["接口 + 测试"]
   contract-tests --> race{{"并行实现"}}
   race --> implement-a["实现 A"]
@@ -579,7 +579,7 @@ flowchart TD
   cr --> common{"存在共同问题?"}
   common -- "有" --> gate(["用户决定：完善约束还是接受现状"])
   common -- "无" --> verdict{"每条赛道都通过?"}
-  gate -- "完善约束" --> design
+  gate -- "完善约束" --> plan
   gate -- "接受现状" --> verdict
   verdict -- "否：按反馈修订" --> race
   verdict -- "是" --> commit["提交"]

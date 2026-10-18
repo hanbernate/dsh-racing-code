@@ -3,7 +3,7 @@
 > **状态：v0.2.0，已实现并装入本机 profile（`web`）。** 零依赖、零构建、宿主半 + 纯函数层，96 个测试全绿；
 > 新增**新项目首次引导**（bootstrap，见 §5 小节「新项目引导」）。
 > 安装、按 agent 注册段落与工具、段落真的进 prompt、改文件热刷新、改配置热生效、
-> "没声明就不启用"都已在真实会话里验过（证据见 [doc/development.md](doc/development.md) §M4）。
+> "没声明就不启用"都已在真实会话里验过（证据见 [docs/development.md](docs/development.md) §M4）。
 
 **racing = 同一赛段，多个模型同时跑，各自一条赛道；CR 当裁判，把意见发回赛道改到通过为止。**
 
@@ -13,7 +13,7 @@
 不注册 `flow_stages`；唯一痕迹是用户显式启动引导时的 `racing_code_init` 工具，见 §5）。
 
 ```text
-<你的项目>/doc/racing-code.md      ← 唯一来源：阶段、顺序、并行赛道、分支、复盘轮、每阶段模型
+<你的项目>/docs/racing-code.md      ← 唯一来源：阶段、顺序、并行赛道、分支、复盘轮、每阶段模型
 （没有这份文件 = 没有流程，插件不注入任何东西，只留引导工具 racing_code_init）
 ```
 
@@ -24,7 +24,7 @@
 plugin_manager  install_bundle  /home/liumenghan/dsh-racing-code
 
 # 2) 在要用流程的项目里放一份流程图；本仓库自己那份可以直接抄
-mkdir -p doc && cp /home/liumenghan/dsh-racing-code/main/doc/racing-code.md doc/racing-code.md
+mkdir -p docs && cp /home/liumenghan/dsh-racing-code/main/docs/racing-code.md docs/racing-code.md
 #    也可以直接对编排者说：给这个项目启动 racing-code（生成模板 → 确认流程 → 逐节点选模型）
 
 # 3) 会话里问一下现在生效的是什么（只读、现读现算）
@@ -35,7 +35,7 @@ mkdir -p doc && cp /home/liumenghan/dsh-racing-code/main/doc/racing-code.md doc/
 图里用到的每条路由要**手工**加进 `Settings → Plugins → Subagent delegation` 的白名单，
 插件会在会话里告诉你缺哪一条。
 
-格式与语义见 [doc/workflow-format.md](doc/workflow-format.md)，设计依据见 [doc/architecture.md](doc/architecture.md)。
+格式与语义见 [docs/workflow-format.md](docs/workflow-format.md)，设计依据见 [docs/architecture.md](docs/architecture.md)。
 
 ---
 
@@ -75,11 +75,11 @@ mkdir -p doc && cp /home/liumenghan/dsh-racing-code/main/doc/racing-code.md doc/
 
 | 情况 | 插件行为 |
 |---|---|
-| 项目里**没有** `doc/racing-code.md` | **沉默**：不注入段落、不注册 `flow_stages`；只有用户明确说「启动 racing-code」时才出现 `racing_code_init` 引导工具（`bootstrapEnabled: false` 可全关，见 §5） |
+| 项目里**没有** `docs/racing-code.md` | **沉默**：不注入段落、不注册 `flow_stages`；只有用户明确说「启动 racing-code」时才出现 `racing_code_init` 引导工具（`bootstrapEnabled: false` 可全关，见 §5） |
 | 文件存在、图能解析 | **启用**：注入流程段落 + 注册 `flow_stages` |
 | 文件存在、图写坏了 | **不注入流程**，只注入**一句诊断**（哪个诊断码、改哪里）；`flow_stages` 可查完整诊断，另有 `racing_code_init`（默认只预览，`force` 才覆盖坏文件） |
 
-- 文件名默认 `doc/racing-code.md`，可用插件配置 `projectFlowPath` 改；
+- 文件名默认 `docs/racing-code.md`，可用插件配置 `projectFlowPath` 改；
 - **模型也在这份文件里**：节点标签第二行（`"实现 A<br/>opencode-go · deepseek-v4.1-flash"`）
   或 front-matter 的 `models:`——两处等价、图内优先。所以"这个项目怎么干活"是**一个文件、一次提交、一份 review**；
 - **升级插件不会改变任何项目的流程**（流程只随项目文件走）；
@@ -126,7 +126,7 @@ flowchart TD
 按 contract-tests 定下的契约实现，让测试转绿。产出：diff + 测试输出。
 ````
 
-四种节点由**形状**决定（[完整语法与语义](doc/workflow-format.md)）：
+四种节点由**形状**决定（[完整语法与语义](docs/workflow-format.md)）：
 
 | 形状 | 类型 | 谁执行 |
 |---|---|---|
@@ -148,7 +148,7 @@ flowchart TD
 ## 5. 起步流程（示例）与本仓库自己的流程
 
 下面这份"两条赛道 + CR 复盘轮"是最小可用形态；本仓库自己也在用
-（[doc/racing-code.md](doc/racing-code.md)，多了"设计定稿"这一道用户关口）：
+（[docs/racing-code.md](docs/racing-code.md)，多了"设计定稿"这一道用户关口）：
 
 | 阶段 | 做什么 | 示例路由 |
 |---|---|---|
@@ -164,7 +164,7 @@ flowchart TD
 
 ⁽¹⁾ 这里曾临时用 `glm-5.3-flash`：`mimo-v2.6-flash` 在 2026-10-17 的实测里对流式请求一律回
 `[model_coming_soon]`，而 DSH 只能流式。**2026-10-18 复测已放行（流式 200）**，示例改回 `mimo-v2.6-flash`；
-两次实测都记在 [doc/compatibility.md](doc/compatibility.md) §2.1。
+两次实测都记在 [docs/compatibility.md](docs/compatibility.md) §2.1。
 
 常见调整：加第三条赛道（并行组再加一条出边 + 一个阶段，`maxLanes` 默认容得下 4 条）；把 CR 换更贵的模型；
 加严/放宽复盘轮；加"发布"关口。**换模型只改标签或 front-matter，不用动结构。**
@@ -185,10 +185,10 @@ flowchart TD
 
 **阶段按声明分流**：声明了模型才委派子代理，没声明（`session`/缺键）就在当前会话直接执行；
 **lane 永远委派**（lane 选 `session` = 子代理继承会话模型）；`commit` 委派是因为配置里声明了模型。
-**`session` 哨兵**：模型表里显式写 `design: session` = 用户**已选定**"不声明模型"（`routeSource: 'session'`）
+**`session` 哨兵**：模型表里显式写 `plan: session` = 用户**已选定**"不声明模型"（`routeSource: 'session'`）
 ——非 lane 阶段在当前会话直接执行、lane 委派时用当前会话模型——**不报** `FLOW_ROUTE_MISSING`，只有**缺键**才报。
 写入安全要点：目标钉死 `projectFlowPath`、越根拒绝、坏文本不落盘（自校验 0 error）、默认只预览、
-覆盖必须显式 `force`。细节见 [doc/bootstrap.md](doc/bootstrap.md)。
+覆盖必须显式 `force`。细节见 [docs/bootstrap.md](docs/bootstrap.md)。
 
 ## 6. 配置项
 
@@ -199,7 +199,7 @@ flowchart TD
 |---|---|---|---|
 | `enabled` | boolean | `true` | 总开关（想临时全关时用） |
 | `bootstrapEnabled` | boolean | `true` | 新项目引导总开关：false 时连"没文件"也**完全沉默**（不注册 `racing_code_init`） |
-| `projectFlowPath` | string | `doc/racing-code.md` | 唯一来源，相对项目根 |
+| `projectFlowPath` | string | `docs/racing-code.md` | 唯一来源，相对项目根 |
 | `maxStageRepeats` | number | `3` | 回边护栏默认值（可被 front-matter 覆盖） |
 | `maxLanes` | number | `4` | 一个并行赛段最多几条 lane（可被 front-matter 覆盖） |
 | `maxReviewRounds` | number | `2` | 最多几轮"CR 反馈 → 赛道修订"（可被 front-matter 覆盖） |
@@ -215,7 +215,7 @@ flowchart TD
 
 ## 8. 运行时到底发生什么
 
-1. 会话创建时，宿主半拿 `agent.session.header.cwd`（项目根），读 `<项目根>/doc/racing-code.md`：
+1. 会话创建时，宿主半拿 `agent.session.header.cwd`（项目根），读 `<项目根>/docs/racing-code.md`：
    没有 → **保持沉默**（只注册 `racing_code_init` 引导工具，见 §5）；有 → 解析图、合并路由（图内标注 > front-matter > 当前会话模型）、
    校验白名单与 CR 复用，缓存住（last-known-good）。
 2. 启用时，它给这个 root agent 注册一条**系统提示段落**（order 700）：文件路径、紧凑图、每阶段路由
@@ -245,7 +245,7 @@ plugin_manager  install_bundle  /home/liumenghan/dsh-racing-code
 **装完什么都不会发生**——直到某个项目声明了自己的流程（或者你显式说「给这个项目启动 racing-code」走引导，见 §5）。要试一下：
 
 ```bash
-mkdir -p doc && cp <本仓库>/doc/racing-code.md doc/racing-code.md    # 或者自己写一份
+mkdir -p docs && cp <本仓库>/docs/racing-code.md docs/racing-code.md    # 或者自己写一份
 ```
 
 前置条件（本次已写入 `~/.dsh/profiles/web/cordis.patch.yml`，并用 `dsh --profile web --dump-config` 核对）：
@@ -277,7 +277,7 @@ mkdir -p doc && cp <本仓库>/doc/racing-code.md doc/racing-code.md    # 或者
     │   ├── bootstrap.js                # 引导纯函数：full/minimal 模板、逐节点选项、前置 plan、九步协议
     │   └── sources.js                  # 取源：读项目流程图、启用判定（disabled/missing/unreadable/invalid/ok）、fs.watch
     ├── locale/                         # 插件卡片标题/描述（zh + en）
-    ├── doc/
+    ├── docs/
     │   ├── racing-code.md              # 本仓库自己的流程（唯一来源的活样例）
     │   ├── bootstrap.md                # 新项目引导：设计与施工图（v0.2.0）
     │   ├── workflow-format.md          # 流程文件格式规范（唯一权威）
@@ -294,13 +294,13 @@ mkdir -p doc && cp <本仓库>/doc/racing-code.md doc/racing-code.md    # 或者
 1. **工作区命令在 `main/` 里跑**（`git -C main status`、`npm test` 要用 `main/` 的绝对路径）；
    容器根只做"整仓"操作：`git worktree list` / `git fetch` / `git branch`。容器根不是工作区，
    所以 `git status` 在那里会报 `must be run in a work tree`——这是预期的。
-2. **流程文件在被跟踪的 `main/doc/racing-code.md`**，而会话的 cwd 是容器根，所以插件配置里要指路：
+2. **流程文件在被跟踪的 `main/docs/racing-code.md`**，而会话的 cwd 是容器根，所以插件配置里要指路：
 
    ```yaml
    # ~/.dsh/profiles/web/cordis.patch.yml
    - id: racing-code
      config:
-       projectFlowPath: main/doc/racing-code.md
+       projectFlowPath: main/docs/racing-code.md
    ```
 
    车道目录也跟着这个布局走：本仓库的流程图写了 `laneDir: branch`，所以两条赛道分别落在
@@ -315,11 +315,11 @@ mkdir -p doc && cp <本仓库>/doc/racing-code.md doc/racing-code.md    # 或者
 
 | 文档 | 给谁看 |
 |---|---|
-| [doc/workflow-format.md](doc/workflow-format.md) | 写流程的人：mermaid 子集、并行赛道/汇合、用户关口、图内模型标注、诊断码、执行语义 |
-| [doc/racing-code.md](doc/racing-code.md) | 本仓库自己的流程（示例 + 抄写起点） |
-| [doc/architecture.md](doc/architecture.md) | 维护者：设计依据、宿主半职责、赛道与 CR、失败模式、决策记录 |
-| [doc/compatibility.md](doc/compatibility.md) | 维护者：我们依赖哪些官方契约、怎么核实的、失效时什么症状 |
-| [doc/development.md](doc/development.md) | 实现者与维护者：里程碑、接口契约、验收标准、**真实会话里的实测证据**、风险清单 |
+| [docs/workflow-format.md](docs/workflow-format.md) | 写流程的人：mermaid 子集、并行赛道/汇合、用户关口、图内模型标注、诊断码、执行语义 |
+| [docs/racing-code.md](docs/racing-code.md) | 本仓库自己的流程（示例 + 抄写起点） |
+| [docs/architecture.md](docs/architecture.md) | 维护者：设计依据、宿主半职责、赛道与 CR、失败模式、决策记录 |
+| [docs/compatibility.md](docs/compatibility.md) | 维护者：我们依赖哪些官方契约、怎么核实的、失效时什么症状 |
+| [docs/development.md](docs/development.md) | 实现者与维护者：里程碑、接口契约、验收标准、**真实会话里的实测证据**、风险清单 |
 
 ## 12. 未决问题
 

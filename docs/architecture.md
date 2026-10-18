@@ -71,7 +71,7 @@ DSH 已经给了全部所需接缝，所以**不需要改 DSH 源码**：
 
 ```
         ┌─ 项目流程（唯一来源）─────────────────────────────────────┐
-        │ <cwd>/doc/racing-code.md      （Config.projectFlowPath）   │  谁写：这个项目自己
+        │ <cwd>/docs/racing-code.md      （Config.projectFlowPath）   │  谁写：这个项目自己
         │   ├─ mermaid 图                阶段·顺序·并行·分支·回退·复核 │
         │   └─ 图内路由标注 / front-matter models:      每阶段用哪个模型 │
         └───────────────────────────────────────────────────────────┘
@@ -153,7 +153,7 @@ DSH 已经给了全部所需接缝，所以**不需要改 DSH 源码**：
 ```js
 {
   enabled: true,                          // 总开关（多项目环境里想临时全关时用）
-  projectFlowPath: 'doc/racing-code.md',  // 唯一来源，相对项目根
+  projectFlowPath: 'docs/racing-code.md',  // 唯一来源，相对项目根
   maxStageRepeats: 3,                     // 回边护栏默认值（可被 front-matter 覆盖）
   maxLanes: 4,                            // 一个并行赛段最多几条 lane（可被 front-matter 覆盖）
   maxReviewRounds: 2,                     // 最多几轮"CR 反馈 → 赛道修订"（可被 front-matter 覆盖）
@@ -267,13 +267,13 @@ DSH 已经给了全部所需接缝，所以**不需要改 DSH 源码**：
 紧凑图示例：
 
 ```text
-项目流程：/home/liumenghan/dsh-racing-code/doc/racing-code.md
-design → (用户定稿?) --否--> design ; --是--> {要改代码吗?} --否：纯文档改动--> commit ; --是--> contract-tests
+项目流程：/home/liumenghan/dsh-racing-code/docs/racing-code.md
+plan → (用户定稿?) --否--> plan ; --是--> {要改代码吗?} --否：纯文档改动--> commit ; --是--> contract-tests
 contract-tests → [race: implement-a ∥ implement-b] → cr
 cr → {存在共同问题?} --有--> (用户决定：完善约束还是接受现状) ; --无--> {每条赛道都通过?}
-     (用户决定) --完善约束--> design ; --接受现状--> {每条赛道都通过?}
+     (用户决定) --完善约束--> plan ; --接受现状--> {每条赛道都通过?}
      {每条赛道都通过?} --否：按反馈修订--> [race] ; --是--> commit
-路由：design=opencode-go·mimo-v2.6-pro  contract-tests=opencode-go·mimo-v2.6-flash
+路由：plan=opencode-go·mimo-v2.6-pro  contract-tests=opencode-go·mimo-v2.6-flash
       implement-a=opencode-go·deepseek-v4.1-flash  implement-b=kilo·kilo-auto/free
       cr=opencode-go·mimo-v2.6-pro  commit=kilo·kilo-auto/free
 规则：顺序阶段按声明分流——声明了 provider/model 的阶段前台 subagent 委派一次（显式传 provider/model）；
@@ -302,8 +302,8 @@ cr → {存在共同问题?} --有--> (用户决定：完善约束还是接受�
 ```jsonc
 {
   "ok": true,
-  "file": "/path/to/proj/doc/racing-code.md",
-  "entry": "design",                         // 来自图里的 `%% entry: <id>` 指令（有回边时必需）
+  "file": "/path/to/proj/docs/racing-code.md",
+  "entry": "plan",                         // 来自图里的 `%% entry: <id>` 指令（有回边时必需）
   "nodes": [                                 // 图上四种节点都在这里，便于模型区分
     { "id": "contract-tests", "kind": "stage",    "label": "接口 + 测试" },
     { "id": "race",           "kind": "group",    "label": "并行实现" },
@@ -327,9 +327,9 @@ cr → {存在共同问题?} --有--> (用户决定：完善约束还是接受�
   "loops": [                                 // 回边：开新一轮 / 重跑阶段
     { "kind": "review", "via": "verdict", "backTo": "race", "condition": "否：按反馈修订",
       "maxRounds": 2, "feedback": "按赛道切分后发回该赛道原子代理" },
-    { "kind": "stage", "via": "gate", "backTo": "design", "condition": "完善约束", "maxRepeats": 3 }
+    { "kind": "stage", "via": "gate", "backTo": "plan", "condition": "完善约束", "maxRepeats": 3 }
   ],
-  "mermaid": "flowchart TD\n  %% entry: design\n  …",   // 渲染出的「带模型的图」，可直接贴给用户
+  "mermaid": "flowchart TD\n  %% entry: plan\n  …",   // 渲染出的「带模型的图」，可直接贴给用户
   "diagnostics": [ { "code": "FLOW_CR_MODEL_REUSED", "level": "warn", "stage": "cr", "message": "…" } ]
 }
 ```

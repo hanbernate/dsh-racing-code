@@ -1,5 +1,5 @@
 // Contract tests for lib/flow.js. Written against the interface and the grammar in
-// doc/workflow-format.md — they must not be adjusted to fit an implementation.
+// docs/workflow-format.md — they must not be adjusted to fit an implementation.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -28,7 +28,7 @@ function doc(frontMatter, mermaidLines, body = '') {
   ].join('\n')
 }
 
-const REAL = readFileSync(new URL('../doc/racing-code.md', import.meta.url), 'utf8')
+const REAL = readFileSync(new URL('../docs/racing-code.md', import.meta.url), 'utf8')
 
 const LINEAR = ['flowchart TD', '  a["A"] --> b["B"]', '  b --> c["C"]']
 const LANES = [
@@ -486,7 +486,7 @@ const LANE_SESSION_GRAPH = [
 test('session_sentinel_runs_in_session_for_a_non_lane_stage', () => {
   const flow = doc(['racing-code: 1', 'models:', '  a: session'], ['flowchart TD', '  a["A"] --> b["B"]'])
   const resolved = resolveFlow(flow, {})
-  const section = renderPolicySection({ ...resolved, file: '/tmp/doc/racing-code.md' })
+  const section = renderPolicySection({ ...resolved, file: '/tmp/docs/racing-code.md' })
   assert.match(section, /a=（在当前会话直接执行）/, 'a session route on a non-lane stage runs here, not in a child')
   assert.match(renderMermaid(resolved), /（在当前会话直接执行）/)
 })
@@ -510,7 +510,7 @@ test('rules_text_splits_execution_by_route', () => {
 test('commit_id_is_not_special_cased', () => {
   const flow = doc(null, ['flowchart TD', '  a["A"] --> commit["Commit"]'])
   const resolved = resolveFlow(flow, {})
-  const section = renderPolicySection({ ...resolved, file: '/tmp/doc/racing-code.md' })
+  const section = renderPolicySection({ ...resolved, file: '/tmp/docs/racing-code.md' })
   assert.match(section, /commit=（在当前会话直接执行）/, 'the id must not decide the execution')
   assert.match(renderMermaid(resolved), /（在当前会话直接执行）/)
   const missing = resolved.problems.find(p => p.code === 'FLOW_ROUTE_MISSING' && p.node === 'commit')
@@ -606,8 +606,8 @@ test('renderPolicySection: never empty, and carries the diagram, routes and rule
   assert.ok(renderPolicySection({ ok: false, problems: [{ code: 'FLOW_FENCE_MISSING', level: 'error', message: 'no diagram' }] }).length > 0)
 
   const resolved = resolveFlow(REAL, {})
-  const text = renderPolicySection({ ...resolved, file: '/tmp/doc/racing-code.md' })
-  assert.match(text, /\/tmp\/doc\/racing-code\.md/)
+  const text = renderPolicySection({ ...resolved, file: '/tmp/docs/racing-code.md' })
+  assert.match(text, /\/tmp\/docs\/racing-code\.md/)
   for (const stage of resolved.stages) assert.ok(text.includes(stage.id), `missing ${stage.id}`)
   assert.match(text, /\[race:/)
   assert.match(text, /worktree/)
@@ -668,7 +668,7 @@ test('laneAgentNameLine: a chained lane names every node on its own line, stems 
 })
 
 test('renderPolicySection: the parallel-group rule pins the lane subagent name to its model', () => {
-  const text = renderPolicySection({ ...resolveFlow(REAL, {}), file: '/tmp/doc/racing-code.md' })
+  const text = renderPolicySection({ ...resolveFlow(REAL, {}), file: '/tmp/docs/racing-code.md' })
   assert.match(text, /子代理显示名/)
   assert.match(text, /词干/)
   assert.match(text, /description/)
@@ -678,7 +678,7 @@ test('renderMermaid: round-trips — the rendering is itself a valid flow docume
   const resolved = resolveFlow(REAL, {})
   const rendered = renderMermaid(resolved)
   assert.match(rendered, /^flowchart TD/)
-  assert.match(rendered, /%% entry: design/)
+  assert.match(rendered, /%% entry: plan/)
   assert.match(rendered, /race\{\{/)
   const reparsed = parseMermaid(doc(null, rendered.split('\n')))
   assert.deepEqual(reparsed.problems, [])
@@ -694,7 +694,7 @@ test('diagnose and summarize: human sentences, and an unusable flow says why', (
   assert.match(summarize(broken), /FLOW_/)
 
   const good = resolveFlow(REAL, {})
-  assert.match(summarize(good), /design/)
+  assert.match(summarize(good), /plan/)
 })
 
 // ─────────────────────────────── the real files ───────────────────────────────
@@ -711,11 +711,11 @@ test('the repository flow file resolves cleanly, with lanes and a review loop', 
   })
   only(resolved.problems)
   assert.deepEqual(resolved.problems.filter(p => p.level === 'error'), [])
-  assert.equal(resolved.entry, 'design')
+  assert.equal(resolved.entry, 'plan')
   assert.deepEqual(resolved.joins, [{ at: 'cr', lanes: ['implement-a', 'implement-b'] }])
   assert.deepEqual(
     resolved.loops.map(l => `${l.kind} ${l.via}->${l.backTo} ${l.maxRounds ?? l.maxRepeats}`).sort(),
-    ['review confirm->race 2', 'stage confirm->design 3', 'stage final->design 3', 'stage gate->design 3'])
+    ['review confirm->race 2', 'stage confirm->plan 3', 'stage final->plan 3', 'stage gate->plan 3'])
   assert.equal(byId(resolved, 'implement-a').lane.worktree, 'racing/implement-a')
   assert.equal(byId(resolved, 'implement-a').route.model, 'deepseek-v4.1-flash')
   assert.equal(byId(resolved, 'implement-a').authorized, true)

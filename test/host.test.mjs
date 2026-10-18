@@ -8,7 +8,7 @@ import { resolveFlow } from '../lib/flow.js'
 import { apply, BOOTSTRAP_TOOL_NAME, Config, inject, resolveConfig, TOOL_NAME } from '../lib/index.js'
 
 const CWD = '/projects/demo'
-const FILE = '/projects/demo/doc/racing-code.md'
+const FILE = '/projects/demo/docs/racing-code.md'
 const GITDIR = '/projects/demo/.bare/worktrees/main'
 
 /** The allowlist the fake session advertises, for the routes the tests pick. */
@@ -85,7 +85,7 @@ function makeCtx({ files = {}, watch = 'ok', agents = [], git = 'worktree-contai
   // intents are honored the way the real backend documents them.
   const state = {
     files: { ...files },
-    dirs: new Set([CWD, `${CWD}/doc`, `${CWD}/.bare`, `${CWD}/.bare/worktrees`, GITDIR]),
+    dirs: new Set([CWD, `${CWD}/docs`, `${CWD}/.bare`, `${CWD}/.bare/worktrees`, GITDIR]),
   }
   if (git === 'worktree-container') state.files[`${CWD}/.git`] = `gitdir: ${GITDIR}\n`
   if (git === 'git-repo') state.dirs.add(`${CWD}/.git`)
@@ -191,7 +191,7 @@ test('the plugin declares its Config as a Standard Schema, with six documented f
   assert.deepEqual(parsed.value, {
     enabled: true,
     bootstrapEnabled: true,
-    projectFlowPath: 'doc/racing-code.md',
+    projectFlowPath: 'docs/racing-code.md',
     maxStageRepeats: 3,
     maxLanes: 4,
     maxReviewRounds: 2,
@@ -370,7 +370,7 @@ test('host_init_preview_returns_template_and_nodes', async () => {
   assert.match(result.template, /^laneDir: branch$/m, 'this project is a worktree container')
   const resolved = resolveFlow(result.template, { allowedModels: ROUTES })
   assert.deepEqual(resolved.problems, [])
-  assert.equal(resolved.entry, 'design')
+  assert.equal(resolved.entry, 'plan')
   assert.equal(byId(resolved, 'implement-a').lane.worktree, 'racing/implement-a')
 
   assert.equal(result.nodes.length, resolved.stages.length)

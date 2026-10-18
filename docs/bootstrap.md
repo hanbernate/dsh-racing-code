@@ -20,8 +20,8 @@
 ## 1. 现状与缺口（HEAD `0009269`）
 
 - 插件三层：[lib/index.js](../lib/index.js)（宿主半，347 行）、[lib/flow.js](../lib/flow.js)（纯函数，1132 行）、[lib/sources.js](../lib/sources.js)（取源，200 行）；测试 4 个文件。
-- [doc/racing-code.md](racing-code.md) 已用 `laneDir: branch`（赛道目录 = 分支名 = `racing/<lane-id>`，见 [workflow-format.md](workflow-format.md) §5.1）。
-- profile：bundle 从 `/home/liumenghan/dsh-racing-code/main` 链接安装；racing-code 行 `projectFlowPath: main/doc/racing-code.md`。
+- [docs/racing-code.md](racing-code.md) 已用 `laneDir: branch`（赛道目录 = 分支名 = `racing/<lane-id>`，见 [workflow-format.md](workflow-format.md) §5.1）。
+- profile：bundle 从 `/home/liumenghan/dsh-racing-code/main` 链接安装；racing-code 行 `projectFlowPath: main/docs/racing-code.md`。
 
 | 缺口 | 位置/证据 |
 |---|---|
@@ -106,14 +106,14 @@ export function bootstrapProtocol(input)        // {file, lanes} → string[]（
 
 ```yaml
 models:
-  design: session            # 显式"用当前会话模型"，不告警
+  plan: session            # 显式"用当前会话模型"，不告警
   cr: session
   implement-a: opencode-go/mimo-v2.6-pro   # 用户选定
 ```
 
 - 改动三处：`routeFromValue` 认裸串 `session` → 哨兵；`mergeRoutes` 命中时 `route = sessionRoute ?? null`、`routeSource: 'session'`、`fallback: true`、**不报** `FLOW_ROUTE_MISSING`；渲染沿用"（用当前会话模型）"。
 - `routeSource` 联合类型与 [architecture.md](architecture.md) §8 的 schema 加 `'session'`；[workflow-format.md](workflow-format.md) §7.2 加关键字、§9 说明。
-- 兼容：旧版插件遇到 `design: session` 只多一条 `FLOW_ROUTE_MALFORMED` warn，**行为不劣化**（照常按会话模型兜底）。
+- 兼容：旧版插件遇到 `plan: session` 只多一条 `FLOW_ROUTE_MALFORMED` warn，**行为不劣化**（照常按会话模型兜底）。
 
 ### 3.4 注册规则（[lib/index.js](../lib/index.js)）
 
@@ -145,7 +145,7 @@ maxLanes: 4
 maxReviewRounds: 2
 laneDir: branch                # 仅当检测到 worktree 容器布局时写
 models:
-  design: session
+  plan: session
   contract-tests: session
   cr: session
   commit: session
@@ -157,9 +157,9 @@ models:
 
 ```mermaid
 flowchart TD
-  %% entry: design
-  design["设计"] --> final(["用户定稿?"])
-  final -- "否" --> design
+  %% entry: plan
+  plan["规划"] --> final(["用户定稿?"])
+  final -- "否" --> plan
   final -- "是" --> needs-code{"要改代码吗?"}
   needs-code -- "是" --> contract-tests["接口 + 测试"]
   contract-tests --> race{{"并行实现"}}
@@ -170,13 +170,13 @@ flowchart TD
   cr --> common{"存在共同问题?"}
   common -- "有" --> gate(["用户决定：完善约束还是接受现状"])
   common -- "无" --> verdict{"每条赛道都通过?"}
-  gate -- "完善约束" --> design
+  gate -- "完善约束" --> plan
   gate -- "接受现状" --> verdict
   verdict -- "否：按反馈修订" --> confirm(["用户确认：把 CR 意见发回赛道?"])
   needs-code -- "否：纯文档改动" --> commit["提交"]
   verdict -- "是" --> commit
   confirm -- "发回修订" --> race
-  confirm -- "先完善约束" --> design
+  confirm -- "先完善约束" --> plan
   confirm -- "接受现状" --> commit
 ```
 
@@ -189,8 +189,8 @@ flowchart TD
 - `minimal` 预设：`plan → contract-tests → race{{}} → implement-a ∥ implement-b → cr → verdict{"每条赛道都通过?"}`，`%% entry: plan`，只留 verdict→race 一条回边。
 - **2026-10-18 重新对齐**：`full` 预设补上 `confirm`（用户确认：把 CR 意见发回赛道?）——此前它是 `verdict --"否"--> race`，
   与本仓库 [racing-code.md](racing-code.md) 漂移。`confirm` 是用户关口（stadium 节点）、**不是阶段**，`## 阶段说明` 里没有它。
-  纯函数层已验：`resolveFlow` **0 error**、`entry: design`、阶段顺序 `design, contract-tests, implement-a, implement-b, cr, commit`、
-  回边集合 `['review confirm->race', 'stage confirm->design', 'stage final->design', 'stage gate->design']`；
+  纯函数层已验：`resolveFlow` **0 error**、`entry: plan`、阶段顺序 `plan, contract-tests, implement-a, implement-b, cr, commit`、
+  回边集合 `['review confirm->race', 'stage confirm->plan', 'stage final->plan', 'stage gate->plan']`；
   `test/bootstrap.test.mjs` 把这条回边集合钉死——**改图必须同步改断言**。
 - 无条件写 `%% entry:`；两条回边都带条件文字；护栏显式写（3/4/2）；lane 的提示词里写死 worktree 绝对路径（[workflow-format.md](workflow-format.md) §11）。
 
@@ -234,12 +234,12 @@ flowchart TD
 | `test/flow.test.mjs` | 改 | `session` 哨兵用例（不告警 + 渲染）；既有 `FLOW_ROUTE_MISSING` 用例不动（missing ≠ session） |
 | `test/package.test.mjs` | 改 | exports 含 `./bootstrap`；patch 含 `bootstrapEnabled: true` |
 | `README.zh.md` / `README.md` | 改（实现后） | §3 沉默+显式指令；§5/§8 预览→两次介入→写盘；§6 加 `bootstrapEnabled`；§12-3 定稿；容器布局章节补 `laneDir` 与引导的关系 |
-| `doc/workflow-format.md` | 改（实现后） | §7.2 `session` 关键字；§9 `BOOTSTRAP_*` 分组；§10 自查加"生成后核对首次清单" |
-| `doc/architecture.md` | 改（实现后） | §8 `routeSource: 'session'`；§10 不变量改写为"唯一的写：用户两次确认后由 `racing_code_init` 写 `projectFlowPath` 一个文件"；§11 决策记录（沉默+两次介入+模型人选+哨兵）；§12 删未决 |
-| `doc/development.md` | 改（实现后） | M6–M8、风险（模板漂移、只读沙箱拒写、误触发）、实测证据 |
-| `doc/compatibility.md` | 改（实现后） | §1.6 补 `ctx.fs.writeText`/`FsWriteIntent` 契约（落前核源）；新增"写入与沙箱栅栏" |
+| `docs/workflow-format.md` | 改（实现后） | §7.2 `session` 关键字；§9 `BOOTSTRAP_*` 分组；§10 自查加"生成后核对首次清单" |
+| `docs/architecture.md` | 改（实现后） | §8 `routeSource: 'session'`；§10 不变量改写为"唯一的写：用户两次确认后由 `racing_code_init` 写 `projectFlowPath` 一个文件"；§11 决策记录（沉默+两次介入+模型人选+哨兵）；§12 删未决 |
+| `docs/development.md` | 改（实现后） | M6–M8、风险（模板漂移、只读沙箱拒写、误触发）、实测证据 |
+| `docs/compatibility.md` | 改（实现后） | §1.6 补 `ctx.fs.writeText`/`FsWriteIntent` 契约（落前核源）；新增"写入与沙箱栅栏" |
 | `locale/zh.json`、`locale/en.json` | 改（实现后） | 卡片描述加"新项目首次引导" |
-| `doc/bootstrap.md` | **本文件** | 设计与修改方案（实现落地后可保留为维护者文档） |
+| `docs/bootstrap.md` | **本文件** | 设计与修改方案（实现落地后可保留为维护者文档） |
 
 ---
 
@@ -263,7 +263,7 @@ flowchart TD
 |---|---|---|---|
 | **M6** | `contract-tests` | 在 `main/` 写下 `lib/bootstrap.js` 的骨架（抛 not implemented）+ `test/bootstrap.test.mjs` + host/flow/package 用例改动，**跑一次红**；契约提交到 `main`（赛道从 HEAD 开分支，看不到未提交的契约） | `cd main && npm test` 红，失败原因都是"未实现" |
 | **M7** | `race` → `cr` | 开赛前在容器根执行 `git worktree add racing/implement-a -b racing/implement-a`（`implement-b` 同理，`laneDir: branch`）；两条赛道只改 `lib/`，不得改 `test/`；CR 逐轮分诊、单赛道问题 `send_message` 发回、共同问题走 `gate` | 每条 lane `npm test` 全绿；没有阻塞问题那一轮才给胜者 |
-| **M8** | `design`（小回环）→ `commit` | 胜者合入 `main`；文档回填（§6 里标"实现后"的那些）；版本 0.2.0；真实新项目 e2e（新开会话）；清理落败 worktree（**保留分支**） | e2e 三条通过；`npm test` 全绿；诊断码表 ↔ 代码交叉检查 |
+| **M8** | `plan`（小回环）→ `commit` | 胜者合入 `main`；文档回填（§6 里标"实现后"的那些）；版本 0.2.0；真实新项目 e2e（新开会话）；清理落败 worktree（**保留分支**） | e2e 三条通过；`npm test` 全绿；诊断码表 ↔ 代码交叉检查 |
 
 ---
 
@@ -275,7 +275,7 @@ node --test test/bootstrap.test.mjs                           # 纯函数层
 git -C /home/liumenghan/dsh-racing-code worktree list         # 赛道 worktree 都在 racing/<lane-id>
 ```
 
-- 新项目（临时目录，无 `doc/`）：新会话 → 系统提示**无** racing-code 痕迹；说"给这个项目启动 racing-code" → 工具只预览；
+- 新项目（临时目录，无 `docs/`）：新会话 → 系统提示**无** racing-code 痕迹；说"给这个项目启动 racing-code" → 工具只预览；
 - 介入 1 确认流程 → 介入 2 逐节点选模型 → 写盘 → **新开会话** → `flow_stages` 可用、段落是流程；
 - 已有流程的项目：行为与现在完全一致（无 init 工具）；
 - 写入失败路径：`force` 关、父目录缺、越根、沙箱拒 —— 都不写盘且给出可执行提示。
@@ -286,7 +286,7 @@ git -C /home/liumenghan/dsh-racing-code worktree list         # 赛道 worktree 
 
 | 风险 | 缓解 |
 |---|---|
-| 模板与 [doc/racing-code.md](racing-code.md) / README §5 三处同构内容漂移 | 测试以"结构同构 + 0 error"断言，不做全文快照；文档写明"改一处同步另两处" |
+| 模板与 [docs/racing-code.md](racing-code.md) / README §5 三处同构内容漂移 | 测试以"结构同构 + 0 error"断言，不做全文快照；文档写明"改一处同步另两处" |
 | 行为变化被当回归（升级后工具表多一条） | README §3/§8 明写 v0.2 变化 + `bootstrapEnabled: false` 逃生 |
 | 插件写项目文件 | 目标钉死、越根拒绝、0 error 自校验、默认只预览、`force` 显式 |
 | `session` 保留字与未来 provider 命名冲突 | 概率≈0，文档写明；旧版插件退化行为不劣化 |

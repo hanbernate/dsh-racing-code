@@ -254,9 +254,9 @@ return { ok: text !== null, reply: text === null ? null : String(text).trim().sl
 | 首次安装本 bundle | 通常可 HMR 激活 | `references/host-plugin.md` |
 | 改本插件自己的 `lib/*.js`（同包替换） | **需要重启** dsh 才能加载新的 JS 模块代 | 同上 |
 | 改 profile 补丁里的 `racing-code` 配置 | 不需要（`patchReload: live`） | profile `package.json` 的 `dsh.profile.patchReload` |
-| 改**项目的** `doc/racing-code.md`（图或模型） | 不需要，**下一个模型步**生效 | §1.6 的 `fs.watch` → 缓存失效 → 逐模型步组装 |
-| **新建** `doc/racing-code.md`（项目从"未启用"变"启用"） | 对已有会话**不生效**，需新开会话 | 段落与工具注册在 agent scope 上，启用状态在 `agent/created` 时判定 |
-| **删除** `doc/racing-code.md` | 当前会话退化为一句诊断；新会话完全不启用 | 同上；last-known-good 对"删除"不适用 |
+| 改**项目的** `docs/racing-code.md`（图或模型） | 不需要，**下一个模型步**生效 | §1.6 的 `fs.watch` → 缓存失效 → 逐模型步组装 |
+| **新建** `docs/racing-code.md`（项目从"未启用"变"启用"） | 对已有会话**不生效**，需新开会话 | 段落与工具注册在 agent scope 上，启用状态在 `agent/created` 时判定 |
+| **删除** `docs/racing-code.md` | 当前会话退化为一句诊断；新会话完全不启用 | 同上；last-known-good 对"删除"不适用 |
 | 改子代理**白名单**并希望已有会话生效 | 做不到，需新开会话 | §1.3 采样时机 |
 | 建 lane 的 worktree（`git worktree add`） | 不需要重启；但**需要会话沙箱允许写项目根** | §1.7（`workspace-write` 覆盖会话工作区；`read-only` 下会被拒，需提权或问用户） |
 | 装完插件后**什么都不配** | **不生效**：没有全局流程，也没有兜底流程 | 插件只在声明了流程图的项目里启用，见 [workflow-format.md](workflow-format.md) §1.1 |

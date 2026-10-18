@@ -1,6 +1,6 @@
 # dsh-racing-code — profile patch layer.
 #
-# One host row. It reads <session cwd>/doc/racing-code.md (Config.projectFlowPath)
+# One host row. It reads <session cwd>/docs/racing-code.md (Config.projectFlowPath)
 # and, only when that file declares a parseable mermaid flow, registers a
 # system-prompt section plus the read-only `flow_stages` tool on that agent.
 #
@@ -13,7 +13,7 @@
       config:
         enabled: true
         bootstrapEnabled: true
-        projectFlowPath: doc/racing-code.md
+        projectFlowPath: docs/racing-code.md
         maxStageRepeats: 3
         maxLanes: 4
         maxReviewRounds: 2
