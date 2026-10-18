@@ -127,7 +127,7 @@ lib/  test/           空目录，等 M1 起
 
 ## M1. 纯函数层 `lib/flow.js`（大）
 
-无 DSH 依赖、无 I/O、可单测。按 `tdd-interface-first`：**先写签名与 JSDoc 契约 → 先写测试（红）→ 再实现（绿）**。
+无 DSH 依赖、无 I/O、可单测。按本流程 `contract-tests` 的 TDD 约束：**先写签名与 JSDoc 契约 → 先写测试（红）→ 再实现（绿）**。
 
 | 函数 | 契约要点 |
 |---|---|
