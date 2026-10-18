@@ -32,8 +32,8 @@ mkdir -p docs && cp /home/liumenghan/dsh-racing-code/main/docs/racing-code.md do
 ```
 
 装完**什么都不配是不生效的**——直到某个项目声明了自己的流程（这是刻意的：见 §3）。
-图里用到的每条路由要**手工**加进 `Settings → Plugins → Subagent delegation` 的白名单，
-插件会在会话里告诉你缺哪一条。
+引导时在选项卡上选中的路由如果还不在白名单里，**插件会替你追加**（只追加、新会话生效）；
+其余情况仍要手工加进 `Settings → Plugins → Subagent delegation`，插件会在会话里告诉你缺哪一条。
 
 格式与语义见 [docs/workflow-format.md](docs/workflow-format.md)，设计依据见 [docs/architecture.md](docs/architecture.md)。
 
@@ -54,8 +54,9 @@ mkdir -p docs && cp /home/liumenghan/dsh-racing-code/main/docs/racing-code.md do
 | 改一次要动什么 | 改全局配置 / 重启会话 | 改**项目里那个 markdown**，**下一个模型步**生效 |
 | 是否真的按图执行 | 无保证 | 宿主半按 agent 注入流程段落，`flow_stages` 给出精确路由、赛道与汇合点 |
 
-官方那条"允许子代理使用哪些模型"的白名单**仍然是硬约束**：图上写的路由必须在白名单内，否则委派会被拒绝。
-插件会把未授权的路由标出来，并告诉你缺哪一条、加到哪里——但**不再有 GUI 自动并入**（见 §7）。
+官方那条"允许子代理使用哪些模型"的白名单**仍然是硬约束**：真正委派时路由必须在白名单内，否则会被 DSH 拒绝。
+区别在于现在**有两条路进白名单**：引导（§5）时在选项卡上选中未授权路由，插件替你追加（只追加、新会话生效）；
+会话期仍会把未授权的路由标出来并告诉你缺哪一条、加到哪里。
 
 ## 2. 为什么叫 racing
 
@@ -179,7 +180,7 @@ flowchart TD
 1. **预览**（`write: false`）：返回结构预览——mermaid 图 + 阶段清单 + 首次清单 + 前置检查 `plan`
    + 逐节点选项 `nodes` + 九步 protocol；**所有阶段模型一律渲染成 `session`**，让结构先成为焦点；
 2. **两次介入**：① **确认流程**（预设 `full` / `minimal`、lane 数、阶段说明都可改）；
-   ② **逐节点确认模型**（选项卡：`用当前会话模型（默认）` + 白名单 ∩ llm 目录里的候选；**赛道必选**）；
+   ② **逐节点确认模型**（选项卡：`用当前会话模型（默认）` + **DSH llm 目录全量**的候选，目录原序；不在白名单里的标"未授权（选中后自动加入白名单）"，选中后由工具追加进白名单；**赛道必选**）；
 3. **写盘**（`write: true`）：写前 `resolveFlow` 0-error 自校验，默认 `createIfAbsent`（已存在不覆盖，
    `force` 才走 `replaceIfVersion`）；赛道缺选拒写 `BOOTSTRAP_CHOICE_REQUIRED`，`plan` 有 blocked 拒写
    `BOOTSTRAP_PLAN_BLOCKED` → **新开会话**才生效（`BOOTSTRAP_RESTART_REQUIRED`）。
@@ -188,6 +189,8 @@ flowchart TD
 **lane 永远委派**（lane 选 `session` = 子代理继承会话模型）；`commit` 委派是因为配置里声明了模型。
 **`session` 哨兵**：模型表里显式写 `plan: session` = 用户**已选定**"不声明模型"（`routeSource: 'session'`）
 ——非 lane 阶段在当前会话直接执行、lane 委派时用当前会话模型——**不报** `FLOW_ROUTE_MISSING`，只有**缺键**才报。
+**`auto` 哨兵**：模型表里写 `commit: auto` = 该阶段**委派**、但路由不写进文件——会话初始化时从 **DSH 的 llm 目录 ∩ 子代理白名单**（目录原序）按声明顺序分配第一个未占用的路由（`routeSource: 'runtime'`，段落里标 `（运行时解析）`）；**赛道缺键 = `auto`**。
+池耗尽或目录不可读 → `FLOW_ROUTE_UNRESOLVED`（warn）+ 退回会话模型；声明的路由不在池里 → `FLOW_ROUTE_UNAVAILABLE`（warn）后按 `auto` 参与分配（模型下线可自愈）。运行时解析**不写白名单**。
 写入安全要点：目标钉死项目的流程路径、越根拒绝、坏文本不落盘（自校验 0 error）、默认只预览、
 覆盖必须显式 `force`。细节见 [docs/bootstrap.md](docs/bootstrap.md)。
 
@@ -216,14 +219,14 @@ flowchart TD
 流程与模型都在项目文件里，那是编辑器和模型的主场。于是客户端半区（`dsh.client`、手写 bundle、locale、
 表单服务、模型目录下拉、插件自有 HTTP 路由）**整体删除**——插件只剩宿主半 + 纯函数 + 取源。
 
-代价是**白名单要手动维护**：在内置的 **Settings → Plugins → Subagent delegation** 页里把你要用的路由加进去。
-插件会在会话里明确告诉你缺哪一条，但不再替你写。
+白名单仍需最终落在内置的 **Settings → Plugins → Subagent delegation** 页里：引导时选中的未授权路由由插件
+**自动追加**（只追加、新会话生效），其余情况插件只明确告诉你缺哪一条，不替你写。
 
 ## 8. 运行时到底发生什么
 
 1. 会话创建时，宿主半拿 `agent.session.header.cwd`（项目根），读 `<项目根>/docs/racing-code.md`：
    没有 → **保持沉默**（只注册 `racing_code_init` 引导工具，见 §5）；有 → 解析图、合并路由（图内标注 > front-matter > 当前会话模型）、
-   校验白名单与 CR 复用，缓存住（last-known-good）。
+   校验白名单、从 **llm 目录 ∩ 白名单**解析运行时路由（`auto` 与赛道缺键）、查 CR 复用，缓存住（last-known-good）。
 2. 启用时，它给这个 root agent 注册一条**系统提示段落**（order 700）：文件路径、紧凑图、每阶段路由
    （未配置/未授权会标出）、执行规则、复盘轮规则；并在**同一个 agent scope** 里注册 `flow_stages` 工具。
    段落是**同步渲染**的，不做 I/O。
@@ -240,7 +243,7 @@ flowchart TD
 7. `flow_stages` 按需给出精确路由、赛道/汇合点、回边与轮次、阶段提示词骨架，以及一张**渲染好的
    "带模型的 mermaid 图"**（可以直接贴给用户或贴进文档）。
 8. 改项目里的流程文件 → **下一个模型步**生效；新建/删除该文件 → 新开会话才改变启用状态；
-   白名单改动 → 新开会话才生效。
+   白名单改动（含引导时的自动加白）→ 新开会话才生效。
 
 ## 9. 安装
 

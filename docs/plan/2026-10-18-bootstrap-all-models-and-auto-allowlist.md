@@ -36,7 +36,7 @@
 |---|---|
 | DSH 的 llm 目录（provider × 广告模型） | `~/.dsh/profiles/web/cordis.patch.yml` → `llm-pi-ai.providers.*.models`；`opencode-go` 有 6 个（含 `qwen3.8-flash`） |
 | 子代理白名单 | 同文件 `subagent-model-selection-settings.config.allowedModels`，当前 5 条，**无 qwen** |
-| 候选池 = 目录 ∩ 白名单 | [lib/index.js](../lib/index.js) `loadCatalog()` × `allowedModels()`；[lib/bootstrap.js](../lib/bootstrap.js) `buildRouteChoices()`（`pool = (catalog ?? []).filter(... allowed.some(...))`） |
+| 候选池 = 目录 ∩ 白名单 | [lib/index.js](../../lib/index.js) `loadCatalog()` × `allowedModels()`；[lib/bootstrap.js](../../lib/bootstrap.js) `buildRouteChoices()`（`pool = (catalog ?? []).filter(... allowed.some(...))`） |
 | 非白名单路由在委派时被拒 | `packages/subagent/tool-subagent/src/model-selection.ts:139` `assertAllowedModelSelection()` |
 | 白名单的服务与写入口 | 服务 `subagentModelSelection`（`current()` → `{enabled, allowedModels}`）；写入口 `ctx.get('settings').describe()/update(ns, patch, revision)`，ns = `subagent-model-selection-settings`（`packages/settings/settings/src/index.ts:347`） |
 | 路由策略在**会话组装时**快照 | `packages/subagent/tool-subagent/src/index.ts:413-441`（`freshSession` 时读 `settings.current()`）→ 加白要**新会话**才生效 |
@@ -126,6 +126,10 @@
 - 分配（**稳定顺序**）：按阶段**声明顺序**（`buildFlow` 的 stages 顺序），每个待分配阶段取池里**第一个未被占用**的路由 → `routeSource: 'runtime'`、`fallback: false`、`authorized: true`；池耗尽 → `FLOW_ROUTE_UNRESOLVED`（warn）+ 退回会话模型（`fallback: true`）。
 - 声明了 `provider/model` 的阶段：命中池则沿用（并占用该池位）；不在池里 → `FLOW_ROUTE_UNAVAILABLE`（warn），随后按 `auto` 参与运行时分配（保留"该阶段委派"的意图，模型腐烂可自愈）。
 - 池不可用（`llm` 服务缺席）→ **完全跳过**运行时解析，退回今天的行为（赛道缺键仍是 `FLOW_ROUTE_MISSING`）。
+- **白名单服务不可读**（服务缺失，或 `enabled: false`）同样把运行时池置空（`runtimePool: null`）→ 关闭运行时解析：
+  `auto` 阶段报 `FLOW_ROUTE_UNRESOLVED`、赛道缺键报 `FLOW_ROUTE_MISSING`，一律退回会话模型。
+  这是 CR 裁定接受的**胜者 A 的语义**（B 曾退化为"整个目录"）；本节把它钉死，[compatibility.md](../compatibility.md) §1.9 与
+  [workflow-format.md](../workflow-format.md) §7.2 同步。
 - `mergeRoutes` 增第 4 参 `{ runtimeAvailable }`：赛道阶段缺键且池可用时不再报 `FLOW_ROUTE_MISSING`，记为 `routeSource: 'auto'`。
 - 刷新：`llm/adapters-updated` 事件（DSH 自家插件同款写法）触发重解析；`flow_stages` 每次调用现读现算，池变化最多在下一问生效。
 - `routeSource` 联合类型增 `'auto' | 'runtime'`；policy section 与 `flow_stages` 把运行时解析出来的路由标注出来。

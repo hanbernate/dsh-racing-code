@@ -43,7 +43,7 @@
 | 4 | 编排者 | **介入 1**：`ask_user_question` 确认流程（预设 `full/minimal`、lane 数 2/3、阶段说明用词都可改） |
 | 5 | 用户 | 「确认流程」或「改结构：…」；改则回 2/3 重新预览，循环到确认 |
 | 6 | 编排者 | **介入 2**：按流程顺序（入口→出口，跳过并行组/判定/用户关口）**逐节点**发问 |
-| 7 | 用户 | 每个节点一个问题：`用当前会话模型（默认）` + 白名单 ∩ llm 目录里的候选路由（附授权与上游备注）。赛道节点必选；CR 那题写明"默认走会话模型，与某条 lane 相同会有自评偏好，请避开或单独指定" |
+| 7 | 用户 | 每个节点一个问题：`用当前会话模型（默认）` + **DSH llm 目录全量**里的候选路由（目录原序，附授权与上游备注；不在白名单里的标"未授权（选中后自动加入白名单）"）。赛道节点必选；CR 那题写明"默认走会话模型，与某条 lane 相同会有自评偏好，请避开或单独指定" |
 | 8 | 编排者 | 收齐 → `racing_code_init({ models:{…}, write:true })` → 自校验 0 error → `createIfAbsent` 落盘 |
 | 9 | 工具/编排者 | 返回计划 + `BOOTSTRAP_RESTART_REQUIRED`：**新开会话**才生效；git / worktree / `.gitignore` 的修复命令由编排者征得用户同意后执行（插件不跑子进程） |
 
@@ -73,7 +73,7 @@
   file: string,                             // 目标绝对路径（= projectFlowPath）
   template: string,                         // 全文（预览与落盘同一份文本）
   nodes: [{ id, kind: 'stage'|'lane', label, brief, required, default: 'session',
-            candidates: [{ provider, model, authorized, note? }] }],   // 流程顺序
+            candidates: [{ provider, model, authorized, willAllowlist, note? }] }],   // 流程顺序；willAllowlist = 选中后会追加进白名单
   plan: [{ item, status: 'ok'|'warn'|'blocked', detail, fix? }],
   protocol: string[],                       // §2 的九步原文（插件沉默，协议必须由工具带）
   diagnostics: string[],
@@ -88,15 +88,15 @@
 ```js
 export function renderBootstrapTemplate(spec)   // {template, lanes, models, guards, laneDir, generatedOn} → string
   // 后置：返回文本经 resolveFlow 解析 0 error（生成器红线）；models 缺省键一律渲染为 session
-export function buildRouteChoices(input)        // {allowedModels, catalog, stages, lanes} → {nodes, notes}
-  // 只产候选与默认值，不做推荐排序；候选 = allowedModels ∩ llm 目录
+export function buildRouteChoices(input)        // {allowedModels, allowlistWritable, catalog, stages, lanes} → {nodes, notes}
+  // 只产候选与默认值，不做推荐排序；候选 = llm 目录全量（目录原序），每条带 authorized / willAllowlist
 export function buildPlan(facts)                // {file, fileExists, parentExists, gitLayout, laneDir, gitignore, nodes, candidates} → PlanItem[]
   // gitLayout: 'worktree-container' | 'git-repo' | 'none' | 'unknown'（fs 启发式，不起子进程）
 export function checkBootstrapTarget(input)     // {cwd, projectFlowPath} → {ok:true, file} | {ok:false, code, message}
 export function bootstrapProtocol(input)        // {file, lanes} → string[]（§2 九步）
 ```
 
-**钉死（本轮约束）**：`catalog` 来自宿主 `ctx.get('llm')`（`listProviders()` 同步 + `await listModels(provider.id)`，映射 `{provider, model: id, note: description?}`）再与 `allowedModels` 求交；`allowedModels === null`（服务不可用）→ 跳过校验、候选 = 全目录；`allowedModels: []` → 零候选 + `BOOTSTRAP_NO_CANDIDATES`；`catalog: null`/目录不可用 → 零候选 + warn。**"零导入"指无 `node:`、无 `@deepseek-ai/*`；允许 `./flow.js` 纯函数导入**（`resolveFlow`）；`renderBootstrapTemplate` **必须在纯层自检 0-error**，不得把自检挪到宿主层。 **生成器与渲染层不得按阶段名分支、不得写死具体模型名**——文案里的模型一律来自声明或传入的 `models`。
+**钉死（v0.3 起）**：`catalog` 来自宿主 `ctx.get('llm')`（`listProviders()` 同步 + `await listModels(provider.id)`，映射 `{provider, model: id, note: description?}`），候选 = **该目录全量**（目录原序、按 provider/model 去重），**不再与 `allowedModels` 求交**：每条候选带 `authorized`（在不在白名单里）与 `willAllowlist`（`!authorized && allowlistWritable`）。`allowedModels === null`（服务不可用）→ 跳过授权检查、全部 `authorized: true` 且不承诺加白；`allowedModels: []` → 全部未授权（目录照常列出）；`catalog: null`/目录不可用 → 零候选 + `BOOTSTRAP_NO_CANDIDATES`。**"零导入"指无 `node:`、无 `@deepseek-ai/*`；允许 `./flow.js` 纯函数导入**（`resolveFlow`）；`renderBootstrapTemplate` **必须在纯层自检 0-error**，不得把自检挪到宿主层。 **生成器与渲染层不得按阶段名分支、不得写死具体模型名**——文案里的模型一律来自声明或传入的 `models`。
 
 **gitLayout 的 fs 启发式**（[architecture.md](architecture.md) §10 禁子进程）：`.git` 是文件且内容含 `gitdir:` 且同级有 `.bare/` → `worktree-container`；`.git` 是目录 → `git-repo`；无 `.git` → `none`；`gitdir` 指向不存在 → `unknown` + warn。
 
@@ -212,9 +212,15 @@ flowchart TD
 4. 默认 `createIfAbsent`；已存在 → `BOOTSTRAP_FILE_EXISTS`（提示 `force`）；`force` 走 `replaceIfVersion`，冲突 → `BOOTSTRAP_WRITE_CONFLICT`；
 5. 写盘先按**本会话**解析沙箱策略（`ctx.sandboxPolicy.resolve({ session })`，与内置 `write`/`edit` 同源）并作为第 5 参传给 `fs.writeText`；缺省会让沙箱后端退回部署默认 `workspace-write`，`danger-full-access` 会话被误拒。仍被拒（如 `read-only`，或 `workspace-write` 目标在会话工作区外）→ `BOOTSTRAP_WRITE_FAILED` + 全文返回，两级降级：申请提权 / 手动创建；
 6. 赛道缺选择（`write:true`）→ `BOOTSTRAP_CHOICE_REQUIRED`（拒写）；
-7. 候选池为空（白名单禁用/为空）→ `BOOTSTRAP_NO_CANDIDATES`（warn；选项卡只剩"用会话模型"）；
+7. 候选池为空（llm 目录缺失或为空）→ `BOOTSTRAP_NO_CANDIDATES`（warn；选项卡只剩"用会话模型"）；
 8. 所选 lane 与显式 `cr` 路由相同 → `BOOTSTRAP_CR_REUSE_RISK`（warn；插件拿不到会话模型名，涉及 `cr: session` 的精确比较留给编排者）；
 9. 写入成功 → `BOOTSTRAP_RESTART_REQUIRED`（info，"新开会话后生效"）。
+
+**加白（v0.3）**：`write:true` 且**全部前置校验通过**后，工具把用户选中的、不在白名单里的路由**追加**进
+`subagent-model-selection-settings.allowedModels`——官方 `settings.describe()` / `update(ns, patch, revision)`，
+**只追加、不删不改不排序**，`SETTINGS_CONFLICT` 重读 revision **与内容**后重试一次；然后才写流程文件。
+诊断码：`BOOTSTRAP_ALLOWLIST_ADDED` / `_NOOP` / `_DISABLED`（info），`_UNAVAILABLE` / `_CONFLICT` / `_WRITE_FAILED`
+（warn，后两者附可粘贴 yml 片段）；**任何结果都不阻断流程文件**，预览与拒写路径零副作用。
 
 **钉死（本轮约束）**：`write:true` 时 `plan` 有 `blocked` 项（如 `gitLayout: 'none'`）一律**拒写**（fix 随 `plan` 返回），诊断码 `BOOTSTRAP_PLAN_BLOCKED`（点名 blocked 项，具体原因见 plan 各项，如 `BOOTSTRAP_PARENT_MISSING`）；`force` 的 `replaceIfVersion` 版本取 `stat.version`；`generatedOn` 必须是 `YYYY-MM-DD`，否则 `BOOTSTRAP_TEMPLATE_INVALID`（含 `-->` 注入防护）；`.git` 文件**无** `gitdir:` → `unknown`（不是 `git-repo`）；相对 `gitdir` 以 `.git` 所在目录为基准解析、路径允许含空格。lane 的 worktree **绝对路径**由编排者在 lane 提示词里写死（[workflow-format.md](workflow-format.md) §11 模板），工具输出与生成文本只给相对目录（`<workBranch>-racing/<lane-id>` / `<laneDir>/<lane-id>`）。`BOOTSTRAP_CR_REUSE_RISK` 保持"无条件提示"（cr 默认走会话模型、lane 与会话撞模型有自评偏好），**精确比较移交编排者**（插件拿不到会话模型名）。
 

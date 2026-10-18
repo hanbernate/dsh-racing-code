@@ -30,9 +30,10 @@ mkdir -p docs && cp /home/liumenghan/dsh-racing-code/main/docs/racing-code.md do
 #    the orchestrator calls flow_stages, and the system prompt carries the same flow
 ```
 
-Installing changes nothing by itself — until a project declares its flow (deliberately, see §3). Every route the
-diagram mentions must be added to the allowlist **by hand** in
-`Settings → Plugins → Subagent delegation`; the plugin tells you which one is missing.
+Installing changes nothing by itself — until a project declares its flow (deliberately, see §3). A route you pick
+during bootstrap that is not in the allowlist yet is appended **by the plugin** (append-only, effective in the
+next session); every other route must be added by hand in `Settings → Plugins → Subagent delegation`, and the
+plugin tells you which one is missing.
 
 ```text
 <your project>/docs/racing-code.md      ← the only source: stages, order, lanes, branches, review rounds, models
@@ -197,7 +198,7 @@ through **two user interventions**:
    `session`**, so the structure stays the focus;
 2. **Two interventions**: ① **confirm the flow** (presets `full` / `minimal`, lane count, stage briefs are all
    editable); ② **confirm each node's model** (tabs: `use the current session model (default)` plus the
-   allowlist ∩ llm catalog candidates; **lanes are required picks**);
+   the whole DSH llm catalog as candidates, in directory order (an unauthorized pick is marked and appended to the allowlist); **lanes are required picks**);
 3. **Write** (`write: true`): a `resolveFlow` zero-error self-check first, `createIfAbsent` by default (an
    existing file is not overwritten; `force` takes `replaceIfVersion`); missing lane choices refuse the write
    with `BOOTSTRAP_CHOICE_REQUIRED`, a `plan` with a blocked item with `BOOTSTRAP_PLAN_BLOCKED` → the flow
@@ -207,6 +208,12 @@ through **two user interventions**:
 declaration (`session`/missing key) it runs directly in the current session. **Lanes always delegate** (a lane
 picking `session` means the child inherits the session model); `commit` delegates because the configuration
 declares a model for it.
+**The `auto` sentinel** (`commit: auto`) declares "delegate, but do not freeze the route": at session start the
+route is resolved from **DSH's llm catalog ∩ the subagent allowlist** (directory order, first free route in stage
+order), and the section labels it `（运行时解析）`. **A lane with no models entry means the same.** An exhausted
+pool or an unreadable catalog reports `FLOW_ROUTE_UNRESOLVED` and falls back to the session model; a declared
+route outside the pool reports `FLOW_ROUTE_UNAVAILABLE` and joins the same assignment. Runtime resolution never
+writes the allowlist.
 **The `session` sentinel**: writing `plan: session` in the models table means the user **has picked** "declare
 no model" (`routeSource: 'session'`) — an undeclared non-lane stage runs directly in the current session, an
 undeclared lane delegates on the session model — and it does **not** report `FLOW_ROUTE_MISSING`; only a

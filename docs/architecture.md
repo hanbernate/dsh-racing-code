@@ -297,7 +297,7 @@ cr → {存在共同问题?} --有--> (用户决定：完善约束还是接受�
 | 参数 | `{ stage?: string }`（省略 = 返回全部阶段） |
 | 取 flow 的对象 | 调用者的 `agent`（`ToolExecutionInput.agent`，`packages/core/tools/index.ts:339`）→ 它的 `session.header.cwd` |
 | 返回 | 见下 |
-| 副作用 | 无（只读；**现读现算**，不依赖缓存，因此永远反映磁盘上的最新版本） |
+| 副作用 | 无（只读；**现读现算**——流程文件与 DSH 的 llm 目录都当场读，因此永远反映当前状态，不依赖缓存） |
 | 失败 | 不抛工具错误；未启用/解析失败时返回 `ok: false` + 诊断 |
 
 ```jsonc
@@ -320,7 +320,7 @@ cr → {存在共同问题?} --有--> (用户决定：完善约束还是接受�
       "lane": { "id": "implement-a", "worktree": "0.0.x-racing/implement-a", "branch": "0.0.x-racing/implement-a",
                 "fanOutFrom": "race", "joinAt": "cr" },
       "route": { "provider": "opencode-go", "model": "deepseek-v4.1-flash", "authorized": true,
-                 "source": "label" },        // label | front-matter | session（显式哨兵）；缺键为 null
+                 "source": "label" },        // label | front-matter | session（显式哨兵）| auto（声明"运行时解析"）| runtime（本次从 DSH 池里分配出来）；缺键为 null
       "next": [ { "when": null, "to": "cr" } ],
       "instruction": "按 contract-tests 定下的契约实现……" }
   ],
@@ -351,7 +351,8 @@ cr → {存在共同问题?} --有--> (用户决定：完善约束还是接受�
 | 文件存在但读不出来（权限/二进制） | `FLOW_FILE_UNREADABLE`，同上只注入一句诊断 |
 | 会话中途文件被删/改名 | 段落退化为 `FLOW_FILE_MISSING_AFTER_ENABLE`（不再显示旧流程），工具返回 `not_enabled`；新会话即完全不启用 |
 | 会话中途文件被改坏 | 保留上一版可用流程（last-known-good）+ 新诊断；下一次组装生效 |
-| 某阶段没有路由 | 非 lane **在当前会话直接执行**；lane **委派时用当前会话模型**；标注 `fallback`，提示"要固定就写进标签第二行/front-matter" |
+| 某阶段没有路由 | 非 lane **在当前会话直接执行**；lane 在 llm 目录可读时**运行时解析**（`routeSource: 'runtime'`，见下一行），目录不可读时才退化为"委派时用当前会话模型"；标注 `fallback`，提示"要固定就写进标签第二行/front-matter" |
+| 阶段声明 `auto`，或赛道缺键而 llm 目录可读 | 会话初始化时从 **llm 目录 ∩ 子代理白名单**（目录原序）按阶段声明顺序分配互不相同的路由 → `routeSource: 'runtime'`、`fallback: false`、`authorized: true`，段落里标 `（运行时解析）`；池耗尽 → `FLOW_ROUTE_UNRESOLVED`（warn）+ 退回会话模型；声明了但不在池里的路由 → `FLOW_ROUTE_UNAVAILABLE`（warn）后参与同一分配 |
 | 路由不在白名单 | 段落与工具标 `authorized: false`，并指出缺哪一条、加到哪里（内置 Subagent 设置页）；委派时官方工具会拒绝（硬约束，不是 bug） |
 | 标签里写着模型但实际生效的是另一个 | `FLOW_LABEL_ROUTE_SHADOWED`（warn）：多半是把渲染产物贴回了文件 |
 | 模型上游不可用 | `flow_stages` 只保证**格式**与白名单，不保证上游存在；症状与排查见 [compatibility.md §3](compatibility.md) |
@@ -366,7 +367,11 @@ cr → {存在共同问题?} --有--> (用户决定：完善约束还是接受�
 
 ## 10. 边界与不变量
 
-- 插件只读工作区里的**一个**约定路径（`Config.projectFlowPath`）：不删、不执行命令、不起子进程。**唯一的写**：用户两次确认（确认流程 → 逐节点选模型）后，由 `racing_code_init` 写项目的流程文件（目标来自 `.dsh/racing-code.yml` 的 `flowPath`，或 `Config.projectFlowPath` 兜底）这**一个**文件（`createIfAbsent`；`force` → `replaceIfVersion`），其余一切零写入；缺文件时**零段落**、只有该工具（`bootstrapEnabled` 可关）。 另外，**代码里不得出现具体的阶段名或模型名**用于分支或文案：阶段与模型只有一个来源——项目流程文件的**声明**与**用户的选择**（模板默认图的阶段 id 只是那张图的定义，不是判断依据）。
+- 插件只读工作区里的**一个**约定路径（`Config.projectFlowPath`）：不删、不执行命令、不起子进程。**写只有两处**，都在两关都过之后（预览与任何拒写路径零副作用）：
+  ① 用户两次确认（确认流程 → 逐节点选模型）后，由 `racing_code_init` 写项目的流程文件（目标来自 `.dsh/racing-code.yml` 的 `flowPath`，或 `Config.projectFlowPath` 兜底）这**一个**文件（`createIfAbsent`；`force` → `replaceIfVersion`）；
+  ② 同一次调用里，把用户在选项卡上**显式选中的、不在白名单里的路由追加**进 DSH 的 `subagent-model-selection-settings.allowedModels`——走官方 `settings.describe()` / `update(ns, patch, revision)`，**只追加、不删不改不排序**，revision 栅栏 + 冲突重读重试一次，失败降级为 warn + 可粘贴片段、绝不阻断流程文件（见 [compatibility.md §1.9](compatibility.md)）。
+  其余一切零写入；缺文件时**零段落**、只有该工具（`bootstrapEnabled` 可关）。
+  另外，**代码里不得出现具体的阶段名或模型名**用于分支或文案：阶段与模型只有三个来源——项目流程文件的**声明**、**用户的选择**，以及（`auto` 或赛道缺键时）**DSH 的 llm 目录 ∩ 子代理白名单**（模板默认图的阶段 id 只是那张图的定义，不是判断依据）。
 - 插件**不建 worktree、不合分支、不删分支**：`git worktree add/remove`、`git merge` 全部由编排者用 bash
   在阶段里做；插件只把"lane 必须隔离、worktree 放哪、结束后不许擅自删"讲清楚。
 - 插件**不代跑判定、不拦截委派、不掌握轮数**：分支、赛道、复盘轮与护栏靠提示段落 + 工具输出讲清楚，
@@ -374,7 +379,7 @@ cr → {存在共同问题?} --有--> (用户决定：完善约束还是接受�
 - 插件**不参与赛道修订**：反馈怎么切分、发给哪个子代理、轮次怎么数，全由编排者按段落规则做
   （插件只把 lane、join、回边与上限**算出来**告诉它）。
 - 插件**不代理模型请求**，也不改写别的插件的 Config。
-- **没有全局状态**：插件的 Config 只有五个开关（§5）；流程与模型的唯一事实来源是项目里的那份 markdown。
+- **没有全局状态**：插件的 Config 只有五个开关（§5）；流程的唯一事实来源是项目里的那份 markdown，模型要么来自它的声明，要么（`auto` 或赛道缺键）来自 DSH 的 llm 目录 ∩ 子代理白名单。
 - 已存在的会话不追溯：段落按 agent 注册，改动对**下一个模型步**生效；但子代理模型白名单仍是
   **会话组合时采样一次**的，改白名单仍需新开会话。
 

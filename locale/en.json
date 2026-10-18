@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Racing code",
-    "description": "Per-project development flows, declared in the project's own docs/racing-code.md as a mermaid diagram: stages run in order, parallel lanes race several models in separate git worktrees, and a CR review feeds each lane its own problems until every lane passes. Projects without that file are not enabled. A first-run bootstrap for new projects generates that file on explicit request: confirm the flow first, then pick each node's model."
+    "description": "Per-project development flows, declared in the project's own docs/racing-code.md as a mermaid diagram: stages run in order, parallel lanes race several models in separate git worktrees, and a CR review feeds each lane its own problems until every lane passes. Projects without that file are not enabled. A first-run bootstrap for new projects generates that file on explicit request: confirm the flow first, then pick each node's model from the whole DSH llm catalog — a model outside the subagent allowlist is appended to it (effective in the next session)."
   }
 }

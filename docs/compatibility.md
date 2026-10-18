@@ -93,7 +93,7 @@ profile `web`，`patchReload: live`，时间 2026-10-17。
   绝对路径不受限）、`packages/fs/fs-sandbox/README.md`（"Reads, listings, metadata, and read-only watches
   work exactly as with `fs-local`; the mutation fence does not restrict observation"）。
 - **推论**：插件读项目里的流程文件**不需要请求提权**，`read-only` 会话里也能读到；反过来，
-  本插件 v1 **不写任何工作区文件**。v0.2 的 bootstrap 是唯一例外：写盘前按**本会话**解析
+  本插件 v1 **不写任何工作区文件**。v0.2 的 bootstrap 是唯一的工作区写入，写盘前按**本会话**解析
   沙箱策略（`ctx.sandboxPolicy.resolve({ session })`）再落栅栏，所以 `danger-full-access` 会话
   不会被部署默认的 `workspace-write` 误伤；真正的 `read-only` 会话仍按 bootstrap 的降级处理。
 - **失效症状**：`FS_NOT_FOUND`（文件不在 → 插件不启用，这是正常路径）、`FS_NOT_TEXT`（二进制 → 当解析失败处理）。
@@ -144,12 +144,14 @@ profile `web`，`patchReload: live`，时间 2026-10-17。
 ### 1.9 `ctx.get('llm')`：llm 目录（bootstrap 模型选项卡的候选来源）
 
 - **依赖**：`llm` 服务的 `listProviders(): LlmProviderInfo[]`（同步）与 `await listModels(providerId): LlmModelInfo[]`
-  （`LlmModelInfo = { provider, id, name, description? }`）。`racing_code_init` 的候选池 = 子代理白名单 ∩ 该目录。 **字段契约**（CR 复评补）：`listProviders(): {id: string}[]`（同步）、`listModels(providerId): Promise<{id: string, description?: string}[]>`；映射为 `{provider: id, model: model.id, note: description?}`。字段不符时防御式降级为空池 + warn（不崩）。
+  （`LlmModelInfo = { provider, id, name, description? }`）。`racing_code_init` 的候选池 = **该目录全量**（目录原序、按 provider/model 去重），每条候选带 `authorized`（在不在白名单里）与 `willAllowlist`（`!authorized` 且白名单可写 = 选中后会被追加）；**不再与白名单求交**。同一份目录 ∩ 白名单也是**会话期运行时池**（`auto` 与赛道缺键的路由在会话初始化时从这里分配，见 [workflow-format.md §7.2](workflow-format.md)）。 **字段契约**（CR 复评补）：`listProviders(): {id: string}[]`（同步）、`listModels(providerId): Promise<{id: string, description?: string}[]>`；映射为 `{provider: id, model: model.id, note: description?}`。字段不符时防御式降级为空池 + warn（不崩）。
 - **核实**：CR 阶段在 /home/liumenghan/deepseek-harness 实证（`packages/llm` 的 api-catalog 与 types）；
   本机目录由 profile 的 `llm-pi-ai` providers 配置提供（opencode-go / kilo）。
 - **降级**：`ctx.get('llm')` 不可用或字段缺失 → 候选为空 + `BOOTSTRAP_NO_CANDIDATES`（选项卡只剩"用会话模型"）；
-  白名单服务不可用（`allowedModels === null`）→ 跳过校验、候选 = 全目录。
-- **失效症状**：选项卡空，或列出了白名单里有、上游却已下线的路由（目录本身也会腐烂，见 §2）。
+  白名单服务不可用（`allowedModels === null`）→ 跳过授权检查：候选仍是全目录、都按已授权展示，且**不承诺加白**（`willAllowlist: false`）；
+  白名单不可读时**运行时池整体关闭**（`runtimePool: null`）：`auto` 与赛道缺键的阶段退回会话模型并报 `FLOW_ROUTE_UNRESOLVED` / `FLOW_ROUTE_MISSING`。
+- **写入**：`settings` 服务缺失 → 不加白（`BOOTSTRAP_ALLOWLIST_UNAVAILABLE` + 可粘贴片段）；`subagentModelSelection.current().enabled === false` → 不加白（`BOOTSTRAP_ALLOWLIST_DISABLED`，此时 DSH 不施加路由策略，显式路由本就不需要授权）；`SETTINGS_CONFLICT` → 重读 revision **与内容**后重试一次。
+- **失效症状**：选项卡空（目录不可用），或列出了上游已下线、白名单里却还留着的路由（目录本身也会腐烂，见 §2）；会话期表现为 `FLOW_ROUTE_UNAVAILABLE`（声明的路由不在池里）或委派时上游报错。
 
 ## 2. 上游模型（不是 DSH 契约，但同样会"漂"）
 

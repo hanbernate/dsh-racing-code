@@ -331,8 +331,10 @@ commit: kilo/kilo-auto/free
 - **按阶段 id 匹配**（lane 也是阶段，所以 lane 各自一条路由——这就是"多个模型分别实现"）；
   **并行组、判定、用户关口不需要路由**；
 - 出现图里没有的 id → 只警告 `FLOW_MODEL_UNKNOWN_STAGE`；
-- 阶段缺路由 → 非 lane **在当前会话直接执行**、lane **委派时用当前会话模型**，并在会话里明确提示（§1.2 第 3 条）；
+- 阶段缺路由 → 非 lane **在当前会话直接执行**；lane 在 llm 目录可读时**运行时解析**，否则**委派时用当前会话模型**，并在会话里明确提示（§1.2 第 3 条）；
 - **关键字 `session`**：显式写 `plan: session` = 用户已选「不声明模型」（`routeSource: 'session'`）——非 lane 阶段在当前会话直接执行、lane 委派时用当前会话模型——**不报** `FLOW_ROUTE_MISSING`；只有**缺键**才报 missing（漏配 ≠ 显式选择）。
+- **关键字 `auto`**：显式写 `commit: auto` = 该阶段**委派**，但路由不在文件里冻结——会话初始化时从 **DSH 的 llm 目录 ∩ 子代理白名单**（目录原序）按阶段声明顺序分配第一个未被占用的路由（`routeSource: 'runtime'`、`fallback: false`、`authorized: true`），段落里标 `（运行时解析）`。**赛道缺键 = `auto`**（lane 永远委派）。池耗尽或目录不可读 → `FLOW_ROUTE_UNRESOLVED`（warn）+ 退回会话模型；声明了 `provider/model` 但不在池里 → `FLOW_ROUTE_UNAVAILABLE`（warn）后按 `auto` 参与同一分配（模型腐烂可自愈）。
+  池是**只读**的：运行时解析**不会**写白名单——自动加白只发生在引导时用户于选项卡上显式选中未授权路由那一次。
 - **CR 的模型不应与任何 lane 相同**（自评会有偏好）：命中就警告 `FLOW_CR_MODEL_REUSED`；
 - 路由是否在子代理**白名单**内由插件单独校验：不在 → 标 `未授权`，并在会话里告诉你**缺哪一条、加到哪里**
   （内置 Subagent 设置页）。多条 lane 意味着**白名单至少要有这么多条可用路由**——这条要在开跑前就看到；
@@ -444,6 +446,8 @@ CR 的结论**不是**"选一个赢家"就结束，而是一个闭环：
 | `FLOW_ROUTE_MALFORMED` | warn | 某阶段的路由写法不对（既不是 `provider/model`，也不是 `{provider, model}`） | 忽略该条，按"未配置"处理并提示 |
 | `FLOW_ROUTE_MISSING` | warn | 某阶段缺路由（**缺键**才报；显式 `session` 不报） | 文案分两种：非 lane →"将在当前会话直接执行"；lane →"委派时用当前会话模型"；均 + 提示 |
 | `FLOW_ROUTE_NOT_AUTHORIZED` | warn | 路由不在子代理白名单 | 标注未授权，并指出缺哪一条、加到哪里 |
+| `FLOW_ROUTE_UNAVAILABLE` | warn | 声明的路由不在运行时池里（模型下线，或不在白名单） | 改按 `auto` 参与运行时分配；分配不到就退回会话模型 |
+| `FLOW_ROUTE_UNRESOLVED` | warn | 要运行时解析，但池已耗尽或 llm 目录不可读 | 该阶段退回当前会话模型；赛道全部退回时横向比较失去意义，先修目录/白名单 |
 | `FLOW_CR_MODEL_REUSED` | warn | CR 的模型与某条 lane 相同 | 提示自评偏好风险，建议换路由 |
 | `FLOW_LOOP_WITHOUT_REVIEW` | warn | 回边指回并行组，但该组之后没有评审阶段 | 提示"这样会重新开跑却没人横向比较" |
 | `FLOW_LABEL_ROUTE_SHADOWED` | warn | 标签第二行像路由但写法不合法，而实际生效的路由来自 front-matter | 提示"看着是 A、跑的是 B" |
@@ -462,7 +466,9 @@ CR 的结论**不是**"选一个赢家"就结束，而是一个闭环：
 | `BOOTSTRAP_PARENT_MISSING` / `BOOTSTRAP_PLAN_BLOCKED` | error | 父目录缺失 / plan 含 blocked 项（写前拒写） |
 | `BOOTSTRAP_WRITE_CONFLICT` / `BOOTSTRAP_WRITE_FAILED` | warn/error | 版本冲突 / fs 写失败（含沙箱拒绝） |
 | `BOOTSTRAP_CHOICE_REQUIRED` | error | write:true 时赛道还没选模型 |
-| `BOOTSTRAP_NO_CANDIDATES` / `BOOTSTRAP_CR_REUSE_RISK` | warn | 候选池为空 / CR 自评偏好提示 |
+| `BOOTSTRAP_NO_CANDIDATES` / `BOOTSTRAP_CR_REUSE_RISK` | warn | 候选池为空（llm 目录缺失或为空）/ CR 自评偏好提示 |
+| `BOOTSTRAP_ALLOWLIST_ADDED` / `_NOOP` / `_DISABLED` | info | 追加了 N 条选中路由 / 都已在白名单里 / 模型选择已关闭（无需加白） |
+| `BOOTSTRAP_ALLOWLIST_UNAVAILABLE` / `_CONFLICT` / `_WRITE_FAILED` | warn | 白名单服务或 `settings` 不可用 / revision 冲突重读重试后仍冲突 / 写入失败 | 均**不阻断流程文件**，附可粘贴的 yml 片段 |
 | `BOOTSTRAP_RESTART_REQUIRED` | info | 写入成功，新开会话生效 |
 
 ## 10. 写完自查
