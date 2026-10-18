@@ -178,3 +178,13 @@
 | 1 | 候选排序 | **目录原序**（provider 顺序 → model 顺序），不重排、不"已授权优先" |
 | 2 | §5 的分配规则 | **稳定顺序**：按阶段声明顺序取池里第一个未被占用的路由 |
 | 3 | §5 是否同轮 | **一起做**：§3 与 §5 同轮开赛道 |
+
+## 11. CR 结果（2026-10-18）
+
+| 项 | 结果 |
+|---|---|
+| 两条赛道 | A @ `d11257f`、B @ `2d98694`；我独立复跑均 **148/148**，`test/` 除契约修正外无人改动 |
+| 胜者 | **A**（opencode-go/deepseek-v4.1-flash，lib/ 325 行）。B 在"冲突重试只重读 revision、拿过期基线覆盖"与"池耗尽仍保留腐烂声明路由"两处有问题；A 无阻塞问题 |
+| 已接受清单 | §5 未钉"白名单服务不可读时池怎么算"（A = 关闭运行时解析，B = 退化为整个目录）：接受 A 的语义，边界留待文档回填 |
+| 契约补强（CR 发现的缺口） | 新增 `host_init_keeps_a_concurrent_allowlist_change_when_it_retries` 与 `assignRuntimeRoutes: a starved declared route falls back to the session model`；胜者 A 在补强后的契约上 **150/150** |
+| 落选赛道 | B 分支保留、worktree 清理；值得挑取：`routeLabel` 分支拆得更细、`allowlistLines` 的 yml 片段带代码围栏 |

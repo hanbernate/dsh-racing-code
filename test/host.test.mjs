@@ -578,7 +578,7 @@ const DIRECTORY = {
  * The DSH services racing-code reads: the subagent allowlist, the settings writer behind it
  * and the llm directory. updates records every settings mutation the plugin makes.
  */
-function dshServices({ allowed = ROUTES, enabled = true, conflict = 0, settings = true, directory = DIRECTORY } = {}) {
+function dshServices({ allowed = ROUTES, enabled = true, conflict = 0, conflictAdds = [], settings = true, directory = DIRECTORY } = {}) {
   const updates = []
   let routes = allowed.map(route => ({ ...route }))
   let current = directory
@@ -594,6 +594,11 @@ function dshServices({ allowed = ROUTES, enabled = true, conflict = 0, settings 
       if (conflictsLeft > 0) {
         conflictsLeft--
         revision++
+        // A real conflict is a concurrent *write*: the other writer may have appended a
+        // route, and the retry must keep it instead of overwriting it with a stale base.
+        for (const route of conflictAdds) {
+          if (!routes.some(entry => entry.provider === route.provider && entry.model === route.model)) routes.push({ ...route })
+        }
         const error = new Error('settings namespace changed since it was read')
         error.code = 'SETTINGS_CONFLICT'
         throw error
@@ -788,5 +793,23 @@ test('host_llm_adapters_updated_re_resolves_the_routes', async () => {
   await tick()
   assert.match(agent.registered.sections[0].text(), /lane-a=opencode-go·mimo-v2\.6-pro（运行时解析）/)
   assert.match(agent.registered.sections[0].text(), /lane-b=kilo·kilo-auto\/free（运行时解析）/)
+})
+
+
+test('host_init_keeps_a_concurrent_allowlist_change_when_it_retries', async () => {
+  // The conflict is not just a revision bump: another writer appends a route in between. The
+  // revision fence protects the write, the re-read protects the content — a retry that writes
+  // the first read's array would silently drop the concurrent addition.
+  const dsh = dshServices({ conflict: 1, conflictAdds: [{ provider: 'other-vendor', model: 'x-large' }] })
+  const { tool } = await bootstrapHarness({ services: dsh.services })
+  const result = await tool.execute({ write: true, models: UNALLOWED_PICK }, {})
+
+  assert.equal(result.wrote, true)
+  assert.equal(dsh.updates.length, 1, 'the retry lands exactly once')
+  assert.deepEqual(keys(dsh.updates[0].patch.allowedModels), [
+    'opencode-go/mimo-v2.6-pro', 'opencode-go/deepseek-v4.1-flash', 'kilo/kilo-auto/free',
+    'other-vendor/x-large', 'opencode-go/glm-5.3-flash',
+  ], 'the concurrent addition survives the retry')
+  assert.ok(result.diagnostics.some(line => line.includes('BOOTSTRAP_ALLOWLIST_ADDED')), result.diagnostics.join(' | '))
 })
 

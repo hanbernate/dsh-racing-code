@@ -824,3 +824,21 @@ test('resolveFlow: a runtime pool fills the lanes and the section labels them', 
   assert.equal(byId(legacy, 'lane-a').route, null)
 })
 
+
+test('assignRuntimeRoutes: a starved declared route falls back to the session model', () => {
+  // Plan §5: a declared route outside the pool joins the runtime assignment; when the pool is
+  // exhausted too, the stage falls back to the session model — it must NOT keep a route the
+  // directory no longer advertises, because that delegation would fail at preflight.
+  const pool = [{ provider: 'opencode-go', model: 'deepseek-v4.1-flash' }]
+  const { stages, problems } = assignRuntimeRoutes([
+    { id: 'implement-a', lane: {}, routeSource: 'auto', fallback: true, route: null },
+    { id: 'commit', routeSource: 'front-matter', fallback: false, route: { provider: 'gone', model: 'x' } },
+  ], pool)
+
+  assert.equal(routeKey(stages[0].route), 'opencode-go/deepseek-v4.1-flash', 'the free slot goes to the auto stage')
+  assert.equal(stages[1].route, null, 'the pool is exhausted: fall back to the session model')
+  assert.equal(stages[1].fallback, true)
+  assert.ok(has(problems, 'FLOW_ROUTE_UNAVAILABLE'), codes(problems).join(','))
+  assert.ok(has(problems, 'FLOW_ROUTE_UNRESOLVED'), codes(problems).join(','))
+})
+
