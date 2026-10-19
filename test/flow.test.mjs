@@ -715,7 +715,13 @@ test('the repository flow file resolves cleanly, with lanes and a review loop', 
   assert.deepEqual(resolved.joins, [{ at: 'cr', lanes: ['implement-a', 'implement-b'] }])
   assert.deepEqual(
     resolved.loops.map(l => `${l.kind} ${l.via}->${l.backTo} ${l.maxRounds ?? l.maxRepeats}`).sort(),
-    ['review confirm->race 2', 'stage confirm->plan 3', 'stage final->plan 3', 'stage gate->plan 3'])
+    ['review confirm->race 2', 'stage baseline->plan 3', 'stage confirm->plan 3', 'stage final->plan 3', 'stage gate->plan 3'])
+  const baseline = nodeById(resolved, 'baseline')
+  assert.ok(baseline, 'the repository flow asks the user before committing the contract baseline')
+  assert.equal(baseline.kind, 'user_gate')
+  assert.deepEqual(nodeById(resolved, 'contract-tests').next.map(edge => edge.to), ['baseline'])
+  assert.deepEqual(baseline.next.map(edge => edge.to).sort(), ['plan', 'race'])
+  assert.deepEqual(baseline.next.map(edge => edge.when).sort(), ['否：先完善契约', '定稿：提交基线并开赛道'])
   assert.equal(byId(resolved, 'implement-a').lane.worktree, 'racing/implement-a')
   assert.equal(byId(resolved, 'implement-a').route.model, 'deepseek-v4.1-flash')
   assert.equal(byId(resolved, 'implement-a').authorized, true)

@@ -21,10 +21,11 @@ models:
 **声明了模型**（front-matter 或图内标注写了 `provider/model`）的阶段才委派子代理；**未声明**（`session` 或缺键）的**在当前会话直接执行**；赛道（lane）结构上永远委派（lane 选 `session` = 子代理继承会话模型）。**没有按阶段命名的例外**——`commit` 委派是因为配置里给它声明了 `kilo/kilo-auto/free`。
 
 写代码之前先用文档把设计说清楚（**设计不写代码**），设计被用户明确确认后才进入实现；
+契约测试基线定稿后**先过 `baseline` 用户关口**：用户确认后才提交基线、才开赛道；
 实现阶段**两个模型各开一条赛道**（各自一个 git worktree，子代理显示名 = `<节点词干>-<model>`），CR 逐轮把各自的问题发回对应赛道
 （**发回之前先由用户确认**：图上 `confirm` 关口），**改到每条赛道都通过才定胜负、提交**。
 
-**非赛道节点都是用户关口**：图上除 lane（赛道）以外的每个节点——`plan` / `final` / `needs-code` / `contract-tests` / `cr` / `common` / `verdict` / `gate` / `confirm` / `commit`——它的结论都由**用户**下。执行方先干完该节点的活（在当前会话执行或委派子代理），再把**完整材料**发出来（问题清单逐条、diff 摘要、建议与依据），用 `ask_user_question` 让用户按出边文字选，等待给足（≥10 分钟）。
+**非赛道节点都是用户关口**：图上除 lane（赛道）以外的每个节点——`plan` / `final` / `needs-code` / `contract-tests` / `baseline` / `cr` / `common` / `verdict` / `gate` / `confirm` / `commit`——它的结论都由**用户**下。执行方先干完该节点的活（在当前会话执行或委派子代理），再把**完整材料**发出来（问题清单逐条、diff 摘要、建议与依据），用 `ask_user_question` 让用户按出边文字选，等待给足（≥10 分钟）。
 **唯一的例外是 lane（赛道）节点**：lane 内部由赛道子代理自行迭代（它是被比较的"作品"）；**lane 之外的每一步都不得替用户拍板**——包括"两条赛道都通过"的 `verdict`，与进入 `commit` 之前。
 
 **纯文档改动不走赛道**：定稿后由 `要改代码吗?` 判定——只改文档（README / `docs/*.md`）就直接收口提交，
@@ -38,7 +39,9 @@ flowchart TD
   final -- "是" --> needs-code{"要改代码吗?"}
   needs-code -- "否：纯文档改动" --> commit["提交"]
   needs-code -- "是" --> contract-tests["接口 + 测试"]
-  contract-tests --> race{{"并行实现"}}
+  contract-tests --> baseline(["用户确认：契约测试基线定稿?"])
+  baseline -- "定稿：提交基线并开赛道" --> race{{"并行实现"}}
+  baseline -- "否：先完善契约" --> plan
   race --> implement-a["实现 A"]
   race --> implement-b["实现 B"]
   implement-a --> cr["CR 评审"]
@@ -80,6 +83,8 @@ flowchart TD
 （TDD 的三步顺序与用例质量要求就落在本节，本项目不依赖全局技能）：
 
 - 在 `lib/*.js` 里写下导出签名与 JSDoc 契约（可以是抛 `not implemented` 的骨架）；
+- **接口也在本阶段写**：签名 / JSDoc / 模板与图的骨架都算接口；`baseline` 关口同时确认**接口 diff 与测试 diff**，
+  赛道只实现行为（函数体、接入与渲染），不得再改接口签名或测试断言；
 - 赛道在 `/home/liumenghan/dsh-racing-code/0.0.x-racing/<lane-id>`（分支名即目录名；前缀见项目配置 `.dsh/racing-code.yml` 的 `workBranch: 0.0.x`）；
 - 在 `test/*.test.mjs` 里按契约写用例（`node --test`），**三类都要有**：
   - **正常路径**：契约承诺的主行为；
@@ -88,7 +93,10 @@ flowchart TD
 - 断言**行为与产出**，不断言私有实现（不 mock 内部私有方法，不断言内部集合类型与调用次数——除非并发/资源语义本身就是契约）；
 - 跑一次 `npm test`，确认**红**，并把红的输出贴进汇报；红的**判据**：失败原因必须与"还没实现"一致
   （骨架抛 `not implemented`，或断言失败）——**一写就是绿的用例说明它没在测任何东西**，先修用例，不要往下走；
-- 测试定稿后**赛道不得修改**；契约本身有问题就停下来说明，回到 `plan`。
+- 测试定稿后**赛道不得修改**；契约本身有问题就停下来说明，回到 `plan`；
+- 跑红后**不要直接提交基线、不要发起赛道**：把接口 diff、测试 diff、红输出、拟用的基线提交信息与赛道计划
+  （worktree / 分支 / 模型）交给用户，走图上 `baseline` 关口；用户选"定稿：提交基线并开赛道"后才提交基线
+  （message 前缀 `contract:`）并进入 `race`；选"否：先完善契约"就回 `plan`。
 
 ### implement-a / implement-b
 

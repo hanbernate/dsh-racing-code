@@ -150,12 +150,12 @@ flowchart TD
 ## 5. 起步流程（示例）与本仓库自己的流程
 
 下面这份"两条赛道 + CR 复盘轮"是最小可用形态；本仓库自己也在用
-（[docs/racing-code.md](docs/racing-code.md)，多了"设计定稿"这一道用户关口）：
+（[docs/racing-code.md](docs/racing-code.md)，多了"设计定稿"与"契约基线定稿"两道用户关口）：
 
 | 阶段 | 做什么 | 示例路由 |
 |---|---|---|
 | `plan` | 出方案、定验收标准；按 `laneDir` 确认赛道目录策略（默认 `.worktrees` 要写进 `.gitignore`；`branch` 模式不用） | `opencode-go` · `mimo-v2.6-pro` |
-| `contract-tests` | 写签名与契约注释、按契约写测试、跑一次确认**红**（**所有赛道的共同标准**） | `opencode-go` · `mimo-v2.6-flash` ⁽¹⁾ |
+| `contract-tests` | 写签名与契约注释、按契约写测试、跑一次确认**红**（**所有赛道的共同标准**；基线提交与开赛道由 `baseline` 关口确认） | `opencode-go` · `mimo-v2.6-flash` ⁽¹⁾ |
 | `race{{并行实现}}` | **并行组**（不是阶段、不需要路由）：同时发两条赛道 | — |
 | `implement-a` | 赛道 1：在自己的 worktree 里实现到绿 | `opencode-go` · `deepseek-v4.1-flash` |
 | `implement-b` | 赛道 2：同一契约、另一个模型、另一个 worktree | `kilo` · `kilo-auto/free` |

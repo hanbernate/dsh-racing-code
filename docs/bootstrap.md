@@ -162,7 +162,9 @@ flowchart TD
   final -- "否" --> plan
   final -- "是" --> needs-code{"要改代码吗?"}
   needs-code -- "是" --> contract-tests["接口 + 测试"]
-  contract-tests --> race{{"并行实现"}}
+  contract-tests --> baseline(["用户确认：契约测试基线定稿?"])
+  baseline -- "定稿：提交基线并开赛道" --> race{{"并行实现"}}
+  baseline -- "否：先完善契约" --> plan
   race --> implement-a["实现 A"]
   race --> implement-b["实现 B"]
   implement-a --> cr["CR 评审"]
@@ -190,8 +192,16 @@ flowchart TD
 - **2026-10-18 重新对齐**：`full` 预设补上 `confirm`（用户确认：把 CR 意见发回赛道?）——此前它是 `verdict --"否"--> race`，
   与本仓库 [racing-code.md](racing-code.md) 漂移。`confirm` 是用户关口（stadium 节点）、**不是阶段**，`## 阶段说明` 里没有它。
   纯函数层已验：`resolveFlow` **0 error**、`entry: plan`、阶段顺序 `plan, contract-tests, implement-a, implement-b, cr, commit`、
-  回边集合 `['review confirm->race', 'stage confirm->plan', 'stage final->plan', 'stage gate->plan']`；
-  `test/bootstrap.test.mjs` 把这条回边集合钉死——**改图必须同步改断言**。
+  回边集合 `['review confirm->race', 'stage confirm->plan', 'stage final->plan', 'stage gate->plan']`
+  （2026-10-19 起再加 `stage baseline->plan`，见下）；`test/bootstrap.test.mjs` 把这条回边集合钉死——**改图必须同步改断言**。
+- **2026-10-19 加 `baseline` 用户关口**：`contract-tests` 与 `race` 之间先问用户"契约测试基线是否定稿"。
+  三条边：`contract-tests --> baseline(["用户确认：契约测试基线定稿?"])`、
+  `baseline -- "定稿：提交基线并开赛道" --> race`、`baseline -- "否：先完善契约" --> plan`。
+  `baseline` 是用户关口、不是阶段；full 的回边集合变为
+  `['review confirm->race', 'stage baseline->plan', 'stage confirm->plan', 'stage final->plan', 'stage gate->plan']`。
+  `minimal` 预设保持 `contract-tests → race` 不变（最小形态不加关口）。
+- `contract-tests` 的 brief 明确：**接口（签名 / JSDoc / 骨架）与对应测试都在该阶段写**；`baseline` 关口同时确认
+  接口 diff 与测试 diff，赛道只实现行为（函数体、接入与渲染），不再改接口签名或测试断言。
 - 无条件写 `%% entry:`；两条回边都带条件文字；护栏显式写（3/4/2）；lane 的提示词里写死 worktree 绝对路径（[workflow-format.md](workflow-format.md) §11）。
 
 ### 4.2 `laneDir` 的自动选择

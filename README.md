@@ -163,12 +163,12 @@ A node's **shape** decides its kind ([full grammar and semantics](docs/workflow-
 ## 5. A starting flow (example) and this repository's own flow
 
 The "two lanes + CR review rounds" flow below is the smallest useful shape; this repository uses it too
-([docs/racing-code.md](docs/racing-code.md), plus a "plan signed off" user gate):
+([docs/racing-code.md](docs/racing-code.md), plus "plan signed off" and "contract baseline signed off" user gates):
 
 | Stage | What it does | Example route |
 |---|---|---|
 | `plan` | approach + acceptance criteria; settle the lane directory (`laneDir`): default `.worktrees` needs a `.gitignore` line, `branch` mode needs none | `opencode-go` · `mimo-v2.6-pro` |
-| `contract-tests` | signatures, contract comments, tests per contract, run once and show **red** (the **shared standard** for every lane) | `opencode-go` · `mimo-v2.6-flash` ⁽¹⁾ |
+| `contract-tests` | signatures, contract comments, tests per contract, run once and show **red** (the **shared standard** for every lane; the `baseline` gate signs off the baseline commit and the race start) | `opencode-go` · `mimo-v2.6-flash` ⁽¹⁾ |
 | `race{{Parallel implement}}` | a **parallel group** (not a stage, no route): starts all lanes at once | — |
 | `implement-a` | lane 1: implement to green inside its own worktree | `opencode-go` · `deepseek-v4.1-flash` |
 | `implement-b` | lane 2: same contract, another model, another worktree | `kilo` · `kilo-auto/free` |

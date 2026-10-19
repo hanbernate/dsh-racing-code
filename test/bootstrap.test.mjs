@@ -128,7 +128,7 @@ test('bootstrap_entry_and_labeled_back_edges', () => {
 
   const full = resolveFlow(renderBootstrapTemplate({ template: 'full', lanes: 2 }), {})
   assert.deepEqual(full.loops.map(loop => `${loop.kind} ${loop.via}->${loop.backTo}`).sort(),
-    ['review confirm->race', 'stage confirm->plan', 'stage final->plan', 'stage gate->plan'])
+    ['review confirm->race', 'stage baseline->plan', 'stage confirm->plan', 'stage final->plan', 'stage gate->plan'])
 })
 
 test('bootstrap_full_template_carries_the_confirm_user_gate', () => {
@@ -145,6 +145,26 @@ test('bootstrap_full_template_carries_the_confirm_user_gate', () => {
   assert.deepEqual(verdict.next.map(edge => edge.to).sort(), ['commit', 'confirm'],
     'the review loop goes back through the user gate, never straight to race')
   assert.ok(!resolved.stages.some(stage => stage.id === 'confirm'), 'a user gate is not a stage')
+})
+
+test('bootstrap_full_template_carries_the_baseline_user_gate', () => {
+  const resolved = resolveFlow(renderBootstrapTemplate({ template: 'full', lanes: 2 }), {})
+  assert.deepEqual(codes(resolved, 'error'), [])
+
+  const baseline = resolved.nodes.find(item => item.id === 'baseline')
+  assert.ok(baseline, 'the full preset asks the user before committing the contract baseline (parity with docs/racing-code.md)')
+  assert.equal(baseline.kind, 'user_gate')
+  assert.deepEqual(baseline.next.map(edge => edge.to).sort(), ['plan', 'race'])
+  assert.deepEqual(baseline.next.map(edge => edge.when).sort(), ['否：先完善契约', '定稿：提交基线并开赛道'])
+
+  const contractTests = resolved.nodes.find(item => item.id === 'contract-tests')
+  assert.deepEqual(contractTests.next.map(edge => edge.to), ['baseline'],
+    'the contract stage cannot start the race directly')
+  assert.ok(!resolved.stages.some(stage => stage.id === 'baseline'), 'a user gate is not a stage')
+
+  const minimal = resolveFlow(renderBootstrapTemplate({ template: 'minimal', lanes: 2 }), {})
+  assert.ok(!minimal.nodes.some(item => item.id === 'baseline'), 'the minimal preset keeps its smallest shape')
+  assert.deepEqual(minimal.nodes.find(item => item.id === 'contract-tests').next.map(edge => edge.to), ['race'])
 })
 
 test('bootstrap_preview_renders_all_stages_as_session', () => {
