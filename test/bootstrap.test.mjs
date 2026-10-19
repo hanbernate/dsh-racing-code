@@ -167,6 +167,17 @@ test('bootstrap_full_template_carries_the_baseline_user_gate', () => {
   assert.deepEqual(minimal.nodes.find(item => item.id === 'contract-tests').next.map(edge => edge.to), ['race'])
 })
 
+test('bootstrap_cr_brief_asks_for_manual_review_notes', () => {
+  for (const template of ['full', 'minimal']) {
+    const resolved = resolveFlow(renderBootstrapTemplate({ template, lanes: 2 }), {})
+    const cr = resolved.stages.find(stage => stage.id === 'cr')
+    assert.ok(cr, `${template} has a cr stage`)
+    assert.match(cr.instruction, /人工/, `${template}: the cr brief must invite manual notes`)
+    assert.match(cr.instruction, /自由文本|不选卡片/, `${template}: free text (no card needed) must be allowed`)
+    assert.match(cr.instruction, /按赛道|切分/, `${template}: notes must be split per lane`)
+  }
+})
+
 test('bootstrap_preview_renders_all_stages_as_session', () => {
   for (const lanes of [2, 3, 4]) {
     const text = renderBootstrapTemplate({ template: 'full', lanes, models: {} })

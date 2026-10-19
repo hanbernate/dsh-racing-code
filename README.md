@@ -74,7 +74,7 @@ missing and where to add it — but **the GUI no longer merges it for you** (see
 | Judge (CR) | all lanes converge on a **review stage** that scores each take against the same standard |
 | Review round | the CR sends **each lane its own problems** back to **that lane's own model** (`send_message` to the same child), which revises in the same worktree/branch and commits; the CR re-reviews, and **only when every lane is clean does that round declare a winner** (at most `maxReviewRounds`, default 2 — past that it asks you) |
 | The signal that matters | a **common problem** (≥2 lanes failing the same way) ≈ an ambiguous or missing constraint. Letting each lane work around it would disguise a spec gap as a style difference, so it **never goes to the lanes** — it stops and asks you |
-| User gate | "fix the constraint and re-run" or "accept as is" (accepted problems go on an *accepted list* and stop blocking later rounds) |
+| User gate | "fix the constraint and re-run" or "accept as is" (accepted problems go on an *accepted list* and stop blocking later rounds); free-text manual CR notes are always welcome |
 | Independence | lanes **never look at each other**: feedback is split per lane, and never includes the other lane's problems or the score comparison |
 | Front wing | the contract and its tests are written **once** (`contract-tests`) so every lane implements the same spec — otherwise comparison is meaningless |
 
@@ -143,7 +143,7 @@ A node's **shape** decides its kind ([full grammar and semantics](docs/workflow-
 | `id["label<br/>provider · model"]` | **stage** | a declared model means a delegated child, no declaration means it runs in the current session; the optional second label line is its model |
 | `id{{"label"}}` | **parallel group** | not a stage: each of its out-edges starts a **lane** |
 | `id{"question"}` | **decision** | the model gives advice and evidence, **the user** decides (`ask_user_question`) |
-| `id(["label"])` | **user gate** | **the user** decides; the edge labels are the options offered |
+| `id(["label"])` | **user gate** | **the user** decides; the edge labels are the options (shortcuts), and free text (manual CR notes) is allowed |
 
 - A cyclic diagram needs a `%% entry: <node id>` line (without it, an ambiguous entry reports
   `FLOW_AMBIGUOUS_ENTRY`);
@@ -172,7 +172,7 @@ The "two lanes + CR review rounds" flow below is the smallest useful shape; this
 | `race{{Parallel implement}}` | a **parallel group** (not a stage, no route): starts all lanes at once | — |
 | `implement-a` | lane 1: implement to green inside its own worktree | `opencode-go` · `deepseek-v4.1-flash` |
 | `implement-b` | lane 2: same contract, another model, another worktree | `kilo` · `kilo-auto/free` |
-| `cr` | reviews each round: per-lane score and issues → **single-lane problems go back to that lane**, **common problems go to the user** → a winner only in the round where every lane passes; **when both pass with no obvious problems, the smaller change wins** | `opencode-go` · `mimo-v2.6-pro` |
+| `cr` | reviews each round: per-lane score and issues → **single-lane problems go back to that lane**, **common problems go to the user** → a winner only in the round where every lane passes; **when both pass with no obvious problems, the smaller change wins**; the user may add manual CR notes, and any notes are handled as feedback first | `opencode-go` · `mimo-v2.6-pro` |
 | `common` / `verdict` | two decisions: any common problems? is every lane passing? | — |
 | `gate` (user gate) | on common problems, ask the user: fix constraints and re-run, or accept | — |
 | `commit` | commit the winner; remove the losing worktree, **keep its branch** | `kilo` · `kilo-auto/free` |

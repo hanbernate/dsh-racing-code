@@ -726,6 +726,8 @@ test('the repository flow file resolves cleanly, with lanes and a review loop', 
   assert.equal(byId(resolved, 'implement-a').route.model, 'deepseek-v4.1-flash')
   assert.equal(byId(resolved, 'implement-a').authorized, true)
   assert.match(byId(resolved, 'cr').instruction, /评审/)
+  assert.match(byId(resolved, 'cr').instruction, /人工 CR 意见/,
+    'the project cr brief must invite manual CR notes')
   assert.deepEqual(resolved.problems.map(p => p.code), [])
 })
 
