@@ -237,6 +237,19 @@ test('bootstrap_cr_brief_stays_within_the_line_budget', () => {
   }
 })
 
+
+// Round 2 (gate → plan): a keyword test cannot catch a *missing* rule — in round 1 both briefs
+// went green while each silently dropped one (lane A lost 不替用户决定, lane B lost the
+// escalation clause). Assert the two semantics stay present, whatever wording wraps them.
+test('bootstrap_cr_brief_keeps_the_no_autonomy_and_escalation_rules', () => {
+  for (const template of ['full', 'minimal']) {
+    const resolved = resolveFlow(renderBootstrapTemplate({ template, lanes: 2 }), {})
+    const cr = resolved.stages.find(stage => stage.id === 'cr')
+    assert.match(cr.instruction, /不替用户决定/, `${template}: the reviewer may not decide for the user`)
+    assert.match(cr.instruction, /发现基线问题回 gate\/plan|基线问题.{0,12}正确(结果|产出)/,
+      `${template}: finding a baseline defect and escalating it is a correct outcome, not a failure`)
+  }
+})
 test('bootstrap_cr_route_question_warns_about_baseline_self_review', () => {
   const { notes } = choices()
   const text = notes.join('\n')

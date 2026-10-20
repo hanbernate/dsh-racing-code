@@ -287,3 +287,72 @@ contract-tests 在 baseline 关口除接口 diff、测试 diff、红输出外，
 | 6 | 上一轮 manual-cr-notes 的收口顺序 | A（先收口再开本轮） |
 | 7 | 结构化 CR checklist 是否进 v2 | 留作 v2 未决 |
 
+## 11. 完善约束轮（第 2 轮）：两条断言补漏
+
+> 2026-10-20 用户在 `gate` 关口选**完善约束**（CR round 1 报出的两条共有模式）。
+> 图上回边：`gate --完善约束--> plan`；本节就是这轮回边落下的设计。
+
+### 11.0 由来：round 1 的两条共有模式
+
+| # | 共有模式 | 证据 | 根因 |
+|---|---|---|---|
+| **C3** | 两条 `cr` brief **各丢一条关键规则**：A 缺「不替用户决定」（基线旧 brief 本来有），B 缺「发现基线问题回 gate/plan 是正确结果」（本文件 §3.2 反目标句） | 探针实测 A `缺 不替用户决定`、B `缺 发现基线问题回 gate`；`grep -n "不替用户决定\|正确结果\|正确产出" test/*.mjs` = **零断言**；本文件 §3.5 建议稿本身就不含「不替用户决定」 | ① 建议稿不全（基线自己的错）；② 断言只测**关键词**，抓不到"丢了哪条规则"；③ 两条赛道都照稿抄，于是**一起**漏 |
+| **C4** | 编排者发给两条赛道的提示词把分支名写成**目录名**（`implement-a-r2`），实际分支是 `0.0.x-racing/implement-a-r2` | A 主动报告并改用实际分支；B 自述照抄错名、但实际提交到正确分支（`git rev-parse --abbrev-ref HEAD` 实测） | 我由 `laneDir` 目录名推断分支；[workflow-format.md §11](../workflow-format.md) 模板写的就是 `<workBranch>-racing/<lane-id>` —— **约束没被执行，不是没说清**；无实害 |
+
+处置：**C3 → 改契约**（§11.1/§11.2）；**C4 → 改编排者做法**，不改约束文件（§11 已正确）：以后赛道提示词的分支名一律取 `git rev-parse --abbrev-ref HEAD` 或 `flow_stages` 的 lane 字段，**不由目录名推断**。
+
+### 11.1 契约：一条新用例、两条新断言（先红）
+
+在 `test/bootstrap.test.mjs` 新增（钉**语义存在**，不钉措辞）：
+
+```javascript
+test('bootstrap_cr_brief_keeps_the_no_autonomy_and_escalation_rules', () => {
+  for (const template of ['full', 'minimal']) {
+    const resolved = resolveFlow(renderBootstrapTemplate({ template, lanes: 2 }), {})
+    const cr = resolved.stages.find(stage => stage.id === 'cr')
+    assert.match(cr.instruction, /不替用户决定/, `${template}: the reviewer may not decide for the user`)
+    assert.match(cr.instruction, /发现基线问题回 gate\/plan|基线问题.{0,12}正确(结果|产出)/,
+      `${template}: finding a baseline defect and escalating it is a correct outcome, not a failure`)
+  }
+})
+```
+
+红的判据：两条赛道现有 brief **各缺一条**，至少一条断言必红；实现改完必须 160/160（159 + 1）。
+
+### 11.2 brief 文案：把两条规则补全（**已定：变体 O1 —— 2026-10-20 `final` 关口用户选择，保持 4 行**）
+
+**变体 O1（推荐）：保持 4 行预算**，把两条规则并进第 2/3 行——约束、文档、注释、行数测试全都不用动：
+
+```javascript
+cr: [
+  IN_SESSION_LINE,
+  '- 先立标准再审：用 plan 的验收标准与需求原文冻结「验收清单 + 基线断言」，先审基线（契约/测试/文档都可能是错的，发现基线问题回 gate/plan 是正确产出），再列两条赛道的共有模式——「两边一样」只说明读到同一份基线，不是正确性证据。',
+  '- 证据优先：赛道自述逐条核对（文件:行 / 测试名 / 输出），无证据不算通过；测试全绿 ≠ 需求满足；问题按赛道切分、原路发回；关口先给完整材料与建议、等待给足，不替用户决定。',
+  '- 每个用户关口都显式邀请**人工 CR 意见**（自由文本，可留空）：只写文字不选卡片也算回答；意见按赛道切分，verdict 写了意见就不直接提交。',
+]
+```
+
+代价：第 2 行约 130 字（round 1 两条赛道都自陈"单行过密"，S2 已记为可接受的代价——细则由项目实例 `docs/racing-code.md` 承载）。
+
+**变体 O2（本轮不采用）：把预算放宽到 5 行**，第 2、3 行拆开、密度下降。代价是**一处约束变更要同步四处**：
+`docs/bootstrap.md:186`（2–4 → 2–5）、`lib/bootstrap.js:124` 与 `:387` 的注释、
+`bootstrap_cr_brief_stays_within_the_line_budget`（≤4 → ≤5）、本文件 §3.5 与 §9 风险表。
+好处：生成项目没有项目实例，5 行能同时保住两条规则与可读性。
+
+### 11.3 赛道与 worktree（第 2 轮）
+
+| 赛道 | 分支 / worktree | 模型 |
+|---|---|---|
+| implement-a | `0.0.x-racing/implement-a-r3`（新，基于新基线） | `opencode-go/deepseek-v4.1-flash` |
+| implement-b | `0.0.x-racing/implement-b-r3`（新，基于新基线） | `opencode-go/mimo-v2.6-flash` |
+
+round 1 的 `-r2` 分支与 worktree **保留不动**（未合入，作为比较记录）。提示词按 C4 修正取分支。
+
+### 11.4 验收
+
+- `npm test` **160/160**；
+- 两条 brief 探针：`不替用户决定` 与 `发现基线问题回 gate/plan` **都在**，行数符合所选变体；
+- 第 1 轮的 11 项验收清单继续有效：只改 `lib/`、两预设 `resolveFlow` 0 error、标签与 notes 到位、
+  生成物自检与阶段顺序/回边集合不变；
+- 文档本轮**不改**（约束没说不清的部分）；CR 若又抓出文档侧问题，照旧走 `gate`。
+
