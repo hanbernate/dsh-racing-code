@@ -54,7 +54,7 @@ Grammar and semantics: [docs/workflow-format.md](docs/workflow-format.md). Ratio
 | One stage, one model | you pick a single model | **parallel lanes**: N models, N worktrees, N independent takes on the same contract |
 | Who did it better | nothing to compare — first one done wins | a **CR stage** scores each lane and lists its problems |
 | Getting it fixed | either you police every round by hand, or it is quietly dropped | **review rounds**: the CR sends each lane its own problems back to **that lane's model**, which revises in the same worktree/branch, and the loop repeats **until every lane passes — only then is a winner declared** (bounded rounds) |
-| Hitting the same wall twice | a human has to notice "this again?" | **common problem → constraint gap**: two lanes failing the same way are *not* each told to work around it; the flow asks you whether to fix the constraint |
+| Hitting the same wall twice | a human has to notice "this again?" | **shared pattern → constraint gap or baseline defect**: two lanes failing the same way (or both skipping the same thing) are *not* each told to work around it; the flow lists it and asks you whether to fix the constraint — or the baseline itself |
 | Branches and loops ("red → back to implement") | prose only | conditional edges, back edges, user gates |
 | Model per stage | only "which models may subagents use" | written on the node label (or in the same file's front matter) |
 | Cost of a change | edit global config, restart a session | edit **that project's markdown**; effective on the **next model step** |
@@ -73,7 +73,7 @@ missing and where to add it — but **the GUI no longer merges it for you** (see
 | Physical isolation | one `git worktree` + branch per lane (`<workBranch>-racing/<lane-id>`, or `racing/<lane-id>` without a work branch) so lanes cannot overwrite each other. The directory defaults to `<project root>/.worktrees/<lane-id>`; with `laneDir: branch` in the flow file it **equals the branch name** (e.g. `0.0.x-racing/implement-a`), matching a container layout where every branch has its own directory |
 | Judge (CR) | all lanes converge on a **review stage** that scores each take against the same standard |
 | Review round | the CR sends **each lane its own problems** back to **that lane's own model** (`send_message` to the same child), which revises in the same worktree/branch and commits; the CR re-reviews, and **only when every lane is clean does that round declare a winner** (at most `maxReviewRounds`, default 2 — past that it asks you) |
-| The signal that matters | a **common problem** (≥2 lanes failing the same way) ≈ an ambiguous or missing constraint. Letting each lane work around it would disguise a spec gap as a style difference, so it **never goes to the lanes** — it stops and asks you |
+| The signal that matters | a **shared pattern** (both lanes doing the same thing — or both omitting it) ≈ an ambiguous or missing constraint, **or a wrong baseline**. "Same on both sides" only means they read the same baseline; it says nothing about correctness. So it **never goes to the lanes** — it is listed, triaged, and it stops and asks you |
 | User gate | "fix the constraint and re-run" or "accept as is" (accepted problems go on an *accepted list* and stop blocking later rounds); free-text manual CR notes are always welcome |
 | Independence | lanes **never look at each other**: feedback is split per lane, and never includes the other lane's problems or the score comparison |
 | Front wing | the contract and its tests are written **once** (`contract-tests`) so every lane implements the same spec — otherwise comparison is meaningless |
@@ -121,9 +121,9 @@ flowchart TD
   race --> implement-b["Implement B<br/>kilo · kilo-auto/free"]
   implement-a --> cr["CR review<br/>opencode-go · mimo-v2.6-pro"]
   implement-b --> cr
-  cr --> common{"Common problems?"}
+  cr --> common{"Common problems or baseline defects?"}
   common -- "yes" --> gate(["User decides: fix constraints or accept?"])
-  common -- "no" --> verdict{"Every lane passing?"}
+  common -- "no" --> verdict{"Every lane meeting the acceptance checklist?"}
   gate -- "fix constraints" --> plan
   gate -- "accept" --> verdict
   verdict -- "no: revise from feedback" --> race
@@ -172,8 +172,8 @@ The "two lanes + CR review rounds" flow below is the smallest useful shape; this
 | `race{{Parallel implement}}` | a **parallel group** (not a stage, no route): starts all lanes at once | — |
 | `implement-a` | lane 1: implement to green inside its own worktree | `opencode-go` · `deepseek-v4.1-flash` |
 | `implement-b` | lane 2: same contract, another model, another worktree | `kilo` · `kilo-auto/free` |
-| `cr` | reviews each round: per-lane score and issues → **single-lane problems go back to that lane**, **common problems go to the user** → a winner only in the round where every lane passes; **when both pass with no obvious problems, the smaller change wins**; the user may add manual CR notes, and any notes are handled as feedback first | `opencode-go` · `mimo-v2.6-pro` |
-| `common` / `verdict` | two decisions: any common problems? is every lane passing? | — |
+| `cr` | standards first, then review: freeze the **acceptance checklist** and the baseline assertions → **audit the baseline** (contracts/tests/docs can be wrong — the baseline is the defendant, not the ruler) → **list shared patterns** ("same on both sides" is not evidence of correctness) → **verify every claim in a lane self-report** → build the acceptance × lane matrix; then send single-lane problems back and take **common problems / baseline defects to the user**. **Passing = every checklist item evidenced + no open baseline defect + no blocking issue** (green tests are only the floor); a winner is declared only in that round, and when both pass cleanly the smaller change wins; the user may add manual CR notes | `opencode-go` · `mimo-v2.6-pro` |
+| `common` / `verdict` | two decisions: any **common problems or baseline defects**? does every lane **meet the acceptance checklist**? | — |
 | `gate` (user gate) | on common problems, ask the user: fix constraints and re-run, or accept | — |
 | `commit` | commit the winner; remove the losing worktree, **keep its branch** | `kilo` · `kilo-auto/free` |
 
@@ -269,9 +269,10 @@ longer writes it for you.
    lane stage names its subagent after that model (`<node stem>-<model>`, per node, from the `flow_stages` name
    line), and waits for all of them
    before the join.
-4. Each lane works inside its own worktree and commits to its own branch; the CR reads every worktree, scores
-   each take, triages **single-lane problems** vs **common problems**, and traces each common problem to the
-   constraint it suggests is missing.
+4. Each lane works inside its own worktree and commits to its own branch; the CR **freezes the acceptance
+   checklist, audits the baseline and lists shared patterns first**, then reads every worktree, scores each take
+   (every claim carries evidence), triages **single-lane problems** vs **common problems / baseline defects**, and
+   traces each of them to the constraint it suggests is missing.
 5. **Review rounds**: single-lane problems are split per lane and `send_message`d back to **that lane's original
    child**, which revises in the same worktree/branch and commits — only the named lanes re-run. The CR
    re-reviews just the new diff, and **only when every lane is clean does that round declare a winner** and move

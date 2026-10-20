@@ -43,7 +43,7 @@
 | 4 | 编排者 | **介入 1**：`ask_user_question` 确认流程（预设 `full/minimal`、lane 数 2/3、阶段说明用词都可改） |
 | 5 | 用户 | 「确认流程」或「改结构：…」；改则回 2/3 重新预览，循环到确认 |
 | 6 | 编排者 | **介入 2**：按流程顺序（入口→出口，跳过并行组/判定/用户关口）**逐节点**发问 |
-| 7 | 用户 | 每个节点一个问题：`用当前会话模型（默认）` + **DSH llm 目录全量**里的候选路由（目录原序，附授权与上游备注；不在白名单里的标"未授权（选中后自动加入白名单）"）。赛道节点必选；CR 那题写明"默认走会话模型，与某条 lane 相同会有自评偏好，请避开或单独指定" |
+| 7 | 用户 | 每个节点一个问题：`用当前会话模型（默认）` + **DSH llm 目录全量**里的候选路由（目录原序，附授权与上游备注；不在白名单里的标"未授权（选中后自动加入白名单）"）。赛道节点必选；CR 那题写明"默认走会话模型，与某条 lane 或写契约基线的阶段相同会有自评偏好（会把自己的基线当地面真值），请避开或单独指定" |
 | 8 | 编排者 | 收齐 → `racing_code_init({ models:{…}, write:true })` → 自校验 0 error → `createIfAbsent` 落盘 |
 | 9 | 工具/编排者 | 返回计划 + `BOOTSTRAP_RESTART_REQUIRED`：**新开会话**才生效；git / worktree / `.gitignore` 的修复命令由编排者征得用户同意后执行（插件不跑子进程） |
 
@@ -169,9 +169,9 @@ flowchart TD
   race --> implement-b["实现 B"]
   implement-a --> cr["CR 评审"]
   implement-b --> cr
-  cr --> common{"存在共同问题?"}
+  cr --> common{"存在共同问题或基线缺陷?"}
   common -- "有" --> gate(["用户决定：完善约束还是接受现状"])
-  common -- "无" --> verdict{"每条赛道都通过?"}
+  common -- "无" --> verdict{"每条赛道都满足验收清单?"}
   gate -- "完善约束" --> plan
   gate -- "接受现状" --> verdict
   verdict -- "否：按反馈修订" --> confirm(["用户确认：把 CR 意见发回赛道?"])
@@ -188,7 +188,7 @@ flowchart TD
 
 > **声明顺序 = 阶段顺序**：`buildFlow` 按节点**首次声明**（带形状那次）的先后列出 stages，契约测试按此断言；要某阶段排最后，让它的声明出现在最后一条边上（上例 `commit` 就是这样排到最后的）。
 
-- `minimal` 预设：`plan → contract-tests → race{{}} → implement-a ∥ implement-b → cr → verdict{"每条赛道都通过?"}`，`%% entry: plan`，只留 verdict→race 一条回边。
+- `minimal` 预设：`plan → contract-tests → race{{}} → implement-a ∥ implement-b → cr → verdict{"每条赛道都满足验收清单?"}`，`%% entry: plan`，只留 verdict→race 一条回边。
 - **2026-10-18 重新对齐**：`full` 预设补上 `confirm`（用户确认：把 CR 意见发回赛道?）——此前它是 `verdict --"否"--> race`，
   与本仓库 [racing-code.md](racing-code.md) 漂移。`confirm` 是用户关口（stadium 节点）、**不是阶段**，`## 阶段说明` 里没有它。
   纯函数层已验：`resolveFlow` **0 error**、`entry: plan`、阶段顺序 `plan, contract-tests, implement-a, implement-b, cr, commit`、
@@ -200,6 +200,12 @@ flowchart TD
   `baseline` 是用户关口、不是阶段；full 的回边集合变为
   `['review confirm->race', 'stage baseline->plan', 'stage confirm->plan', 'stage final->plan', 'stage gate->plan']`。
   `minimal` 预设保持 `contract-tests → race` 不变（最小形态不加关口）。
+- **2026-10-20 CR 协议 v2（标签与 brief）**：图上两个判定标签改文案——`common` 变成
+  "存在共同问题或基线缺陷?"（让"基线错了"成为图上可见的一种"有"）、`verdict` 变成"每条赛道都满足验收清单?"
+  （把"通过"锚到验收清单而不是测试绿）；`cr` 的 brief 换成"先立标准 → 审基线 → 列共有模式 → 证据优先 →
+  验收清单"，`laneBrief` 加"每条结论带证据"。起因是 2026-10-20 用户对实际 CR 的四条复盘
+  （比较式评审放过共有问题、基线当真值、依赖自述、为过 gate 而优化），计划见
+  [plan/2026-10-20-cr-protocol-v2.md](plan/2026-10-20-cr-protocol-v2.md)。
 - `contract-tests` 的 brief 明确：**接口（签名 / JSDoc / 骨架）与对应测试都在该阶段写**；`baseline` 关口同时确认
   接口 diff 与测试 diff，赛道只实现行为（函数体、接入与渲染），不再改接口签名或测试断言。
 - 无条件写 `%% entry:`；两条回边都带条件文字；护栏显式写（3/4/2）；lane 的提示词里写死 worktree 绝对路径（[workflow-format.md](workflow-format.md) §11）。
@@ -223,7 +229,7 @@ flowchart TD
 5. 写盘先按**本会话**解析沙箱策略（`ctx.sandboxPolicy.resolve({ session })`，与内置 `write`/`edit` 同源）并作为第 5 参传给 `fs.writeText`；缺省会让沙箱后端退回部署默认 `workspace-write`，`danger-full-access` 会话被误拒。仍被拒（如 `read-only`，或 `workspace-write` 目标在会话工作区外）→ `BOOTSTRAP_WRITE_FAILED` + 全文返回，两级降级：申请提权 / 手动创建；
 6. 赛道缺选择（`write:true`）→ `BOOTSTRAP_CHOICE_REQUIRED`（拒写）；
 7. 候选池为空（llm 目录缺失或为空）→ `BOOTSTRAP_NO_CANDIDATES`（warn；选项卡只剩"用会话模型"）；
-8. 所选 lane 与显式 `cr` 路由相同 → `BOOTSTRAP_CR_REUSE_RISK`（warn；插件拿不到会话模型名，涉及 `cr: session` 的精确比较留给编排者）；
+8. 所选 lane 与显式 `cr` 路由相同 → `BOOTSTRAP_CR_REUSE_RISK`（warn；插件拿不到会话模型名，涉及 `cr: session` 的精确比较留给编排者）。提示同时点出**基线自审**风险：基线多半由会话里的编排者自己写，CR 若与写基线的阶段同模型，会把自己的基线当地面真值——换模型不能根治（CR 要跑用户关口），所以 `cr` 的阶段说明要求"基线是被告"这一步兜底；
 9. 写入成功 → `BOOTSTRAP_RESTART_REQUIRED`（info，"新开会话后生效"）。
 
 **加白（v0.3）**：`write:true` 且**全部前置校验通过**后，工具把用户选中的、不在白名单里的路由**追加**进

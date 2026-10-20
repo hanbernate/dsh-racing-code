@@ -730,6 +730,28 @@ test('the repository flow file resolves cleanly, with lanes and a review loop', 
     'the project cr brief must invite manual CR notes')
   assert.deepEqual(resolved.problems.map(p => p.code), [])
 })
+// CR protocol v2 (2026-10-20): the review answers "is the requirement met?", treats the
+// baseline as the defendant, lists shared patterns instead of diffing A against B, and
+// verifies lane self-reports. These assert the brief's semantics, not its wording order.
+test('the repository CR brief carries the v2 protocol and the decisions name their anchors', () => {
+  const resolved = resolveFlow(REAL, {})
+  const cr = byId(resolved, 'cr')
+  assert.match(cr.instruction, /验收清单/, 'CR freezes an acceptance checklist before reading any diff')
+  assert.match(cr.instruction, /基线/, 'CR audits the baseline instead of assuming it')
+  assert.match(cr.instruction, /共有模式/, 'CR lists the shared patterns explicitly')
+  assert.match(cr.instruction, /证据/, 'CR verifies lane claims against evidence')
+  assert.match(cr.instruction, /测试全绿/, 'green tests are explicitly not the pass criterion')
+  assert.match(cr.instruction, /基线是本会话上一轮写的/, 'the self-review bias is named out loud')
+
+  assert.match(nodeById(resolved, 'common').label, /基线/, 'the common decision covers baseline defects')
+  assert.match(nodeById(resolved, 'verdict').label, /验收清单/, 'the verdict is anchored to the checklist')
+
+  assert.match(byId(resolved, 'plan').instruction, /验收标准/, 'plan must state checkable acceptance criteria')
+  assert.match(byId(resolved, 'contract-tests').instruction, /测试盲区/,
+    'the baseline gate carries the contract assumptions and test blind spots')
+  assert.match(byId(resolved, 'implement-a').instruction, /证据/, 'lane outputs carry evidence per claim')
+})
+
 
 test('the repository flow file still resolves when the allowlist is unavailable', () => {
   const resolved = resolveFlow(REAL, { allowedModels: null })

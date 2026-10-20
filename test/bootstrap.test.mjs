@@ -177,6 +177,74 @@ test('bootstrap_cr_brief_asks_for_manual_review_notes', () => {
     assert.match(cr.instruction, /按赛道|切分/, `${template}: notes must be split per lane`)
   }
 })
+// ─────────────────────── CR protocol v2: audit the baseline first ───────────────────────
+
+// The four failure modes the 2026-10-20 review called out: comparative review that only
+// diffs A against B, a baseline authored by the reviewer treated as ground truth, lane
+// self-reports accepted as testimony, and "green tests" standing in for "requirement met".
+// The brief must carry the fix; a brief without it is not the same CR.
+test('bootstrap_cr_brief_audits_the_baseline_before_comparing_lanes', () => {
+  for (const template of ['full', 'minimal']) {
+    const resolved = resolveFlow(renderBootstrapTemplate({ template, lanes: 2 }), {})
+    const cr = resolved.stages.find(stage => stage.id === 'cr')
+    assert.ok(cr, `${template} has a cr stage`)
+    assert.match(cr.instruction, /验收清单/, `${template}: CR freezes an acceptance checklist before reading diffs`)
+    assert.match(cr.instruction, /基线/, `${template}: the baseline is audited, not treated as ground truth`)
+    assert.match(cr.instruction, /共有|共同模式/, `${template}: shared patterns get their own pass`)
+    assert.match(cr.instruction, /证据/, `${template}: evidence-first — lane self-reports are not testimony`)
+    assert.match(cr.instruction, /测试全绿|需求满足/, `${template}: green tests are the floor, not the goal`)
+  }
+})
+
+test('bootstrap_lane_brief_requires_evidence_per_claim', () => {
+  for (const template of ['full', 'minimal']) {
+    const resolved = resolveFlow(renderBootstrapTemplate({ template, lanes: 2 }), {})
+    const lane = resolved.stages.find(stage => stage.id === 'implement-a')
+    assert.ok(lane, `${template} has a lane stage`)
+    assert.match(lane.instruction, /证据/, `${template}: lane outputs carry evidence per claim`)
+    assert.match(lane.instruction, /文件:行|测试名|输出/, `${template}: evidence means file:line / test name / command output`)
+  }
+})
+
+test('bootstrap_full_template_anchors_the_decisions_to_baseline_and_checklist', () => {
+  const resolved = resolveFlow(renderBootstrapTemplate({ template: 'full', lanes: 2 }), {})
+  assert.deepEqual(codes(resolved, 'error'), [])
+
+  const common = resolved.nodes.find(node => node.id === 'common')
+  assert.ok(common, 'the full preset has the common decision')
+  assert.match(common.label, /基线/, 'the decision asks about baseline defects, not only shared failures')
+
+  const verdict = resolved.nodes.find(node => node.id === 'verdict')
+  assert.ok(verdict, 'the full preset has the verdict decision')
+  assert.match(verdict.label, /验收清单/, 'passing is anchored to the acceptance checklist, not to green tests')
+})
+
+test('bootstrap_minimal_verdict_is_anchored_to_the_acceptance_checklist', () => {
+  const resolved = resolveFlow(renderBootstrapTemplate({ template: 'minimal', lanes: 2 }), {})
+  assert.deepEqual(codes(resolved, 'error'), [])
+  const verdict = resolved.nodes.find(node => node.id === 'verdict')
+  assert.ok(verdict, 'the minimal preset keeps a verdict decision')
+  assert.match(verdict.label, /验收清单/, 'minimal anchors passing to the acceptance checklist too')
+})
+
+// The line budget is a rule the previous round silently broke (both lanes shipped a 5-line
+// cr brief while the generator says 2-4 actionable lines): it has to be a test, not a comment.
+test('bootstrap_cr_brief_stays_within_the_line_budget', () => {
+  for (const template of ['full', 'minimal']) {
+    const resolved = resolveFlow(renderBootstrapTemplate({ template, lanes: 2 }), {})
+    const lines = resolved.stages.find(stage => stage.id === 'cr').instruction.split('\n')
+    assert.ok(lines.length <= 4, `${template}: the cr brief must stay within 4 actionable lines, got ${lines.length}`)
+  }
+})
+
+test('bootstrap_cr_route_question_warns_about_baseline_self_review', () => {
+  const { notes } = choices()
+  const text = notes.join('\n')
+  assert.match(text, /cr/, 'the question still names the reviewer')
+  assert.match(text, /自评|偏好/, 'the self-preference warning stays')
+  assert.match(text, /基线/, 'the question warns that a same-model reviewer judges its own baseline')
+})
+
 
 test('bootstrap_preview_renders_all_stages_as_session', () => {
   for (const lanes of [2, 3, 4]) {
